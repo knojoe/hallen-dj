@@ -212,7 +212,7 @@ details .in{padding:2px 16px 14px}
 <input type="file" id="dirIn" webkitdirectory directory multiple hidden>
 <input type="file" id="multiIn" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple hidden>
 <input type="file" id="logoIn" accept="image/*" hidden>
-<input type="file" id="bakIn" accept=".json,application/json" hidden>
+<input type="file" id="bakIn" accept=".zip,.json,application/zip,application/json" hidden>
 <div class="toast" id="toast"></div>
 <div class="numbuf" id="numbuf"></div>
 
@@ -233,9 +233,9 @@ const get=k=>db?tx('readonly',s=>s.get(k)):Promise.resolve(mem.get(k));
 const del=k=>db?tx('readwrite',s=>s.delete(k)):(mem.delete(k),Promise.resolve());
 
 /* ---------- Startzustand ---------- */
-const defCats=[['Einlauf','#ffffff'],['Stimmung','#3d7bff'],['Tor Heim','#2fd17a'],['Torsongs Spieler','#c6ff3d'],['7m','#ff7a1a'],['2 Min','#ff3344'],['Auszeit','#22c3e6'],['Halbzeit','#8a95a8'],['Sieg','#ffc21a']].map(([name,color])=>({id:uid(),name,color,players:name==='Torsongs Spieler'}));
 const mk=(cat,name,sid,o={})=>({id:uid(),catId:cat.id,name,color:'',soundId:sid,vol:90,fadeIn:0,fadeOut:1.5,start:0,end:0,loop:false,excl:'cat',dur:0,...o});
-let S={settings:{master:90,fadeAll:2.5,tap:'fade',cols:4,view:'tabs',tab:'all'},cats:defCats,pads:[
+function defaults(){const defCats=[['Einlauf','#ffffff'],['Stimmung','#3d7bff'],['Tor Heim','#2fd17a'],['Torsongs Spieler','#c6ff3d'],['7m','#ff7a1a'],['2 Min','#ff3344'],['Auszeit','#22c3e6'],['Halbzeit','#8a95a8'],['Sieg','#ffc21a']].map(([name,color])=>({id:uid(),name,color,players:name==='Torsongs Spieler'}));
+  return{settings:{master:90,fadeAll:2.5,tap:'fade',cols:4,view:'tabs',tab:'all',mig2:1},cats:defCats,pads:[
   mk(defCats[1],'Stadion-Hupe','gen:horn',{fadeOut:.5,excl:'none'}),
   mk(defCats[1],'Trommelwirbel','gen:drum',{excl:'none'}),
   mk(defCats[6],'Countdown-Piep','gen:beep',{fadeOut:0}),
@@ -243,7 +243,8 @@ let S={settings:{master:90,fadeAll:2.5,tap:'fade',cols:4,view:'tabs',tab:'all'},
   mk(defCats[4],'7m-Spannung (Datei wählen)',null),
   mk(defCats[5],'2 Minuten (Datei wählen)',null),
   mk(defCats[3],'Spielername',null,{nr:'7'})
-]};
+]}}
+let S=defaults();
 let editMode=false;
 
 const save=()=>put('state',S).catch(()=>{});
@@ -320,9 +321,9 @@ function play(p,preview){
   unlock();if(!p.soundId){if(!preview)openPad(p.id);return}
   const s=SND.get(p.soundId);
   if(s)return start(p,s,preview);
-  const el=padEls.get(p.id);if(el)el.classList.add('ld');
+  const pe=padEls.get(p.id);if(pe)pe.el.classList.add('ld');
   ensure(p.soundId).then(x=>{if(x)start(p,x,preview);else toast('Datei fehlt – bitte im Pad neu wählen')})
-    .catch(()=>toast('„'+p.name+'“ kann nicht gelesen werden'))}
+    .catch(e=>{const pe=padEls.get(p.id);if(pe)pe.el.classList.remove('ld');toast('„'+p.name+'“ kann nicht gelesen werden'+(e&&e.message?': '+e.message:''))})}
 function start(p,s,preview){try{
   if(!p.dur){p.dur=s.dur;save()}
   let dest=master,dk=null;
@@ -376,7 +377,7 @@ function tapPad(id){
     if(a==='fade')return fade(id);if(a==='stop'){kill(id);renderNow();paint();return}}
   play(p)
 }
-window.addEventListener('error',e=>{console.error(e.error||e.message);toast('Kleiner Fehler abgefangen – Board läuft weiter')});
+window.addEventListener('error',e=>{console.error(e.error||e.message);toast('Fehler abgefangen: '+String(e.message||e.error||'').slice(0,80))});
 window.addEventListener('unhandledrejection',e=>{console.error(e.reason);e.preventDefault()});
 
 /* ---------- Oberfläche ---------- */
@@ -515,7 +516,7 @@ function openSet(){const s=S.settings;
   <details><summary>Kategorien</summary><div class="in"><div id="catList"></div><button class="btn" id="cAdd">+ Kategorie</button>
    <p class="hint">Farbe antippen zum Wechseln, Pfeile zum Sortieren. Beim Löschen wandern die Sounds in die erste Kategorie.</p></div></details>
   <details><summary>Sicherung &amp; Speicher</summary><div class="in">
-   <p class="hint">Alle Sounds liegen nur hier im Browser dieses Geräts. Eine Sicherung als Datei schützt vor Verlust und bringt das Board auf ein anderes Gerät.</p>
+   <p class="hint">Alle Sounds liegen nur hier im Browser dieses Geräts. Die Sicherung ist eine ZIP-Datei mit allen Songs, Einstellungen und dem Logo. Sie schützt vor Verlust und bringt das Board auf ein anderes Gerät. Alte .json-Sicherungen lassen sich weiter laden.</p>
    <div class="acts"><button class="btn" id="bExp">Sicherung exportieren</button><button class="btn" id="bImp">Sicherung laden</button></div>
    <p class="hint" id="quota"></p>
    <div class="acts"><button class="btn del" id="bReset">Alles zurücksetzen</button></div>
@@ -526,23 +527,65 @@ function openSet(){const s=S.settings;
 }
 function renderCats(){$('#catList').innerHTML=S.cats.map((c,i)=>`<div class="catrow"><button class="cdot" style="--c:${c.color}" data-cc="${c.id}" aria-label="Farbe"></button><input class="txt" data-cn="${c.id}" value="${esc(c.name)}" maxlength="24"><button class="ib" data-cu="${c.id}" ${i?'':'disabled'}>↑</button><button class="ib" data-cd="${c.id}">↓</button><button class="ib" data-cx="${c.id}" style="color:var(--stop)">×</button></div>`).join('')}
 
+/* ---------- Sicherung als ZIP (ohne Base64, Song für Song = wenig Speicher) ---------- */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(u8,c=0xFFFFFFFF){for(let i=0;i<u8.length;i++)c=CRC[(c^u8[i])&255]^(c>>>8);return c}
+const enc=new TextEncoder();
+async function makeZip(files,onProg){const parts=[],cd=[];let off=0,i=0;
+  for(const f of files){i++;if(onProg)onProg(i,files.length);
+    const name=enc.encode(f.name),blob=f.blob instanceof Blob?f.blob:new Blob([f.blob]);
+    let c=0xFFFFFFFF;const CH=4*1048576;for(let p=0;p<blob.size;p+=CH){c=crc32(new Uint8Array(await blob.slice(p,p+CH).arrayBuffer()),c)}c=(c^0xFFFFFFFF)>>>0;
+    const lh=new DataView(new ArrayBuffer(30));lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(8,0,true);
+    lh.setUint32(14,c,true);lh.setUint32(18,blob.size,true);lh.setUint32(22,blob.size,true);lh.setUint16(26,name.length,true);
+    parts.push(lh.buffer,name,blob);
+    const ch=new DataView(new ArrayBuffer(46));ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);
+    ch.setUint32(16,c,true);ch.setUint32(20,blob.size,true);ch.setUint32(24,blob.size,true);ch.setUint16(28,name.length,true);ch.setUint32(42,off,true);
+    cd.push(ch.buffer,name);off+=30+name.length+blob.size}
+  const cdSize=cd.reduce((s,b)=>s+(b.byteLength??b.length),0);
+  const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cdSize,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...cd,e.buffer],{type:'application/zip'})}
+async function readZip(blob){const tail=new DataView(await blob.slice(Math.max(0,blob.size-65558)).arrayBuffer());let p=-1;
+  for(let i=tail.byteLength-22;i>=0;i--)if(tail.getUint32(i,true)===0x06054b50){p=i;break}if(p<0)throw new Error('kein ZIP');
+  const n=tail.getUint16(p+10,true),cdS=tail.getUint32(p+12,true),cdO=tail.getUint32(p+16,true);
+  const cd=new DataView(await blob.slice(cdO,cdO+cdS).arrayBuffer()),dec=new TextDecoder(),out={};let q=0;
+  for(let k=0;k<n;k++){const meth=cd.getUint16(q+10,true),size=cd.getUint32(q+20,true),nl=cd.getUint16(q+28,true),xl=cd.getUint16(q+30,true),cl=cd.getUint16(q+32,true),lo=cd.getUint32(q+42,true);
+    const name=dec.decode(new Uint8Array(cd.buffer,q+46,nl));q+=46+nl+xl+cl;
+    const lh=new DataView(await blob.slice(lo,lo+30).arrayBuffer()),start=lo+30+lh.getUint16(26,true)+lh.getUint16(28,true);
+    out[name]={meth,blob:blob.slice(start,start+size)}}
+  return out}
+const dataUrlToBlob=d=>{const [h,b]=d.split(',');const bin=atob(b),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:(h.match(/data:([^;]+)/)||[])[1]||''})};
+const safeName=s=>String(s||'sound').replace(/[\\/:*?"<>|]+/g,'_').slice(0,80);
 async function exportBak(){
-  toast('Sicherung wird erstellt …');const sounds={};
-  for(const p of S.pads){if(p.soundId&&!p.soundId.startsWith('gen:')&&!sounds[p.soundId]){const r=await get('snd:'+p.soundId);if(r){const d=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(r.blob)});sounds[p.soundId]={name:r.name,data:d}}}}
-  let logo=null;try{const lg=await get('logo');if(lg)logo=await new Promise(res=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.readAsDataURL(lg)})}catch(e){}
-  const blob=new Blob([JSON.stringify({v:1,state:S,sounds,logo})],{type:'application/json'});
-  const fn='hallen-dj-sicherung-'+new Date().toISOString().slice(0,10)+'.json';
+  const files=[],names={};
+  for(const sid of new Set(S.pads.map(p=>p.soundId).filter(x=>x&&!x.startsWith('gen:')))){const r=await get('snd:'+sid);if(r){names[sid]=r.name;files.push({name:'sounds/'+sid+'__'+safeName(r.name),blob:r.blob})}}
+  let lg=null;try{lg=await get('logo')}catch(e){}if(lg)files.push({name:'logo',blob:lg});
+  files.unshift({name:'hallen-dj.json',blob:new Blob([JSON.stringify({v:2,state:S,names,logo:!!lg})])});
+  const z=await makeZip(files,(i,n)=>toast(`Sicherung wird gepackt … ${i}/${n}`));
+  const fn='hallen-dj-sicherung-'+new Date().toISOString().slice(0,10)+'.zip';
   let dl=null;try{dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null}catch(e){}
-  if(dl){try{await dl.save({filename:fn,data:blob});toast('Sicherung gespeichert')}catch(e){toast(e&&e.code==='declined'?'Abgebrochen':'Speichern nicht möglich')}return}
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);
-  try{a.click();toast('Sicherung erstellt – in „Dateien“ speichern')}catch(e){toast('Download in dieser Ansicht gesperrt')}setTimeout(()=>a.remove(),1000)
+  if(dl){try{await dl.save({filename:fn,data:z});toast('Sicherung gespeichert')}catch(e){toast(e&&e.code==='declined'?'Abgebrochen':'Speichern nicht möglich ('+(e&&e.code||'?')+')')}return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(z);a.download=fn;document.body.appendChild(a);
+  try{a.click();toast('Sicherung erstellt – in „Dateien“ ablegen')}catch(e){toast('Download in dieser Ansicht gesperrt')}setTimeout(()=>{a.remove();URL.revokeObjectURL(a.href)},60000)
 }
 async function importBak(f){
-  try{const j=JSON.parse(await f.text());if(!j.state)throw 0;stopAll();
-    for(const [sid,s] of Object.entries(j.sounds||{})){const blob=await (await fetch(s.data)).blob();drop(sid);await put('snd:'+sid,{blob,name:s.name})}
-    if(j.logo){const lb=await (await fetch(j.logo)).blob();await put('logo',lb);showLogo(lb)}
-    S=j.state;await save();$('#ovSet').classList.remove('open');render();renderNow();toast('Sicherung geladen')}catch(e){toast('Datei ist keine gültige Sicherung')}
+  try{stopAll();let st=null,n=0;
+    const isZip=/\.zip$/i.test(f.name)||new Uint32Array(await f.slice(0,4).arrayBuffer())[0]===0x04034b50;
+    if(isZip){const z=await readZip(f);const meta=z['hallen-dj.json'];if(!meta)throw new Error('keine Board-Sicherung');const j=JSON.parse(await meta.blob.text());st=j.state;
+      for(const [name,e] of Object.entries(z)){if(!name.startsWith('sounds/'))continue;if(e.meth!==0)throw new Error('ZIP ist komprimiert');const sid=name.slice(7).split('__')[0];
+        drop(sid);await put('snd:'+sid,{blob:new Blob([e.blob],{type:''}),name:j.names?.[sid]||name.split('__')[1]||'sound'});n++;toast('Lade Sounds … '+n)}
+      if(z.logo){await put('logo',z.logo.blob);showLogo(z.logo.blob)}}
+    else{const j=JSON.parse(await f.text());st=j.state;
+      for(const [sid,s] of Object.entries(j.sounds||{})){drop(sid);await put('snd:'+sid,{blob:dataUrlToBlob(s.data),name:s.name});n++}
+      if(j.logo){const lb=dataUrlToBlob(j.logo);await put('logo',lb);showLogo(lb)}}
+    if(!st||!st.cats)throw new Error('keine Board-Sicherung');
+    S=st;await save();$('#ovSet').classList.remove('open');render();renderNow();toast(`Sicherung geladen · ${n} Sounds`);preloadAll()}
+  catch(e){console.warn(e);toast('Sicherung konnte nicht geladen werden: '+(e&&e.message||'ungültige Datei'))}
 }
+async function preloadAll(){for(const sid of [...new Set(S.pads.map(p=>p.soundId).filter(Boolean))]){try{await ensure(sid)}catch(e){console.warn('Sound nicht lesbar',sid,e)}}}
+async function resetAll(){stopAll();duck(false);
+  for(const sid of [...SND.keys()])drop(sid);
+  try{if(db)await tx('readwrite',s=>s.clear());else mem.clear()}catch(e){}
+  showLogo(null);S=defaults();await save();editMode=false;$('#ovSet').classList.remove('open');render();renderNow();showMixer();preloadAll();toast('Board zurückgesetzt')}
 
 /* ---------- Ereignisse ---------- */
 document.addEventListener('pointerdown',unlock,{passive:true});
@@ -599,8 +642,7 @@ $('#dSet').addEventListener('click',async e=>{const t=e.target.closest('button')
   if(t.id==='lgDel'){await del('logo');showLogo(null);openSet();return}
   if(t.id==='bExp')exportBak();
   if(t.id==='bImp')$('#bakIn').click();
-  if(t.id==='bReset'){if(!t.dataset.sure){t.dataset.sure=1;t.textContent='Wirklich alles löschen?';return}
-    stopAll();for(const p of S.pads)if(p.soundId&&!p.soundId.startsWith('gen:'))await del('snd:'+p.soundId);await del('state');location.reload()}
+  if(t.id==='bReset'){if(!t.dataset.sure){t.dataset.sure=1;t.textContent='Wirklich alles löschen? Nochmal tippen';return}await resetAll();return}
   save()});
 $('#bakIn').addEventListener('change',e=>{const f=e.target.files[0];e.target.value='';if(f)importBak(f)});
 let nbuf='',nbt;
@@ -733,7 +775,7 @@ try{if('serviceWorker' in navigator&&location.protocol==='https:'&&window.top===
   try{const lg=await get('logo');if(lg)showLogo(lg)}catch(e){}
   showMixer();
   render();renderNow();
-  for(const sid of [...new Set(S.pads.map(p=>p.soundId).filter(Boolean))]){try{await ensure(sid)}catch(e){}} // nacheinander laden = wenig Speicherspitze
+  preloadAll(); // nacheinander laden = wenig Speicherspitze
 })();
 }
 </script>
