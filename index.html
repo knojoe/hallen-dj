@@ -115,9 +115,13 @@ input[type=range]{flex:1;height:40px;accent-color:#14b8a6;background:none}
 .miss div{flex:1 1 260px}.miss b{display:block;font:800 15px Manrope;color:#ffd77a}.miss span{font-size:13px;color:#d9c79a}
 .sec.over{outline:3px dashed #fff;outline-offset:-3px;background:rgba(255,255,255,.06)}
 .pad.dragging{opacity:.25}
-.ghost{position:fixed;z-index:40;pointer-events:none;width:150px;transform:translate(-50%,-50%) rotate(-3deg) scale(1.05);box-shadow:0 18px 40px rgba(0,0,0,.6);opacity:.95}
+.pad.ghost,.ghost{position:fixed;margin:0;z-index:40;pointer-events:none;max-width:200px;transform:translate(-50%,-50%) rotate(-3deg) scale(1.05);box-shadow:0 18px 40px rgba(0,0,0,.6);opacity:.95}
 .dropmark{outline:3px solid #fff;outline-offset:2px}
-.editing .pad[data-pad]{touch-action:pan-y}
+.grip{position:absolute;z-index:3;top:5px;right:5px;width:42px;height:42px;border-radius:9px;background:rgba(0,0,0,.42);display:grid;align-content:center;justify-items:center;gap:4px;touch-action:none;cursor:grab}
+.grip i{display:block;width:18px;height:2.5px;border-radius:2px;background:#fff}
+.pad.pl .grip{top:4px;right:4px;width:36px;height:36px}
+body.dragging-now,body.dragging-now *{cursor:grabbing!important}
+.editing .pad[data-pad]:not(.pl) .nm{padding-right:42px}
 /* Board */
 main{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:12px;padding-bottom:12px;scrollbar-width:thin}
 .sec{background:rgba(17,22,32,.82);border:1px solid var(--line);border-radius:16px;overflow:hidden;flex:none}
@@ -127,7 +131,7 @@ main{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:12px;pa
 .grid{display:grid;grid-template-columns:repeat(var(--cols,5),minmax(0,1fr));gap:10px;padding:14px}
 .pad{position:relative;overflow:hidden;-webkit-touch-callout:none;aspect-ratio:1.3;border-radius:11px;background:var(--c);color:#fff;text-align:left;padding:11px 12px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid rgba(255,255,255,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 6px 14px -8px rgba(0,0,0,.7);transition:transform .08s}
 .pad:active{transform:scale(.96)}
-.pad .nm{position:relative;font:700 clamp(13px,1.35vw,16px)/1.2 Manrope;text-shadow:0 1px 2px rgba(0,0,0,.2);overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pad .nm{position:relative;font:700 clamp(13px,1.35vw,16px)/1.2 Manrope;text-shadow:0 1px 2px rgba(0,0,0,.2);overflow-wrap:break-word;hyphens:auto;-webkit-hyphens:auto;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .pad .meta{position:relative;display:flex;justify-content:space-between;align-items:end;gap:6px;font:600 11px Manrope;color:rgba(255,255,255,.82)}
 .pad .meta span{white-space:nowrap}
 .pad .meta .tm{order:2;font:700 11px Manrope;font-variant-numeric:tabular-nums}
@@ -468,8 +472,9 @@ const offTxt=()=>S.settings.tap==='stop'?'TIPPEN = STOPP':S.settings.tap==='rest
 function padHtml(p,i){
   const empty=!p.soundId||MISSING.has(p.soundId),ld=!empty&&!SND.has(p.soundId),pl=isPl(p);const k=i<9&&!pl?`<span class="key">${i+1}</span>`:'';
   const tm=`<span class="tm">${MISSING.has(p.soundId)?'Song fehlt':empty?'keine Datei':fmt(p.dur?(p.end||p.dur)-(p.start||0):0)}</span>`;
-  if(pl)return `<button class="pad pl ${empty?'empty':''} ${ld?'ld':''}" style="--c:${colorOf(p)}" data-pad="${p.id}"><span class="off">${offTxt()}</span><div class="fill"></div><div class="nr">${p.nr!=null&&p.nr!==''?esc(p.nr):'–'}</div><div class="meta"><span class="pn">${esc(p.name)}</span>${tm}</div></button>`;
-  return `<button class="pad ${empty?'empty':''} ${ld?'ld':''}" style="--c:${colorOf(p)}" data-pad="${p.id}">${k}<span class="off">${offTxt()}</span><div class="fill"></div><div class="nm">${esc(p.name)}</div><div class="meta">${tm}<span>${p.loop?'Loop · ':''}${p.fadeOut?'Fade '+p.fadeOut+'s':''}</span></div></button>`
+  const grip=editMode?'<span class="grip" data-grip="1" aria-label="Verschieben"><i></i><i></i><i></i></span>':'';
+  if(pl)return `<button class="pad pl ${empty?'empty':''} ${ld?'ld':''}" style="--c:${colorOf(p)}" data-pad="${p.id}">${grip}<span class="off">${offTxt()}</span><div class="fill"></div><div class="nr">${p.nr!=null&&p.nr!==''?esc(p.nr):'–'}</div><div class="meta"><span class="pn">${esc(p.name)}</span>${tm}</div></button>`;
+  return `<button class="pad ${empty?'empty':''} ${ld?'ld':''}" style="--c:${colorOf(p)}" data-pad="${p.id}">${grip}${editMode?'':k}<span class="off">${offTxt()}</span><div class="fill"></div><div class="nm">${esc(p.name)}</div><div class="meta">${tm}<span>${p.loop?'Loop · ':''}${p.fadeOut?'Fade '+p.fadeOut+'s':''}</span></div></button>`
 }
 const addHtml=(cid,pl)=>`<button class="pad add" data-add="${cid}">${pl?'+ Spieler-Song':'+ Sound hinzufügen'}</button>`;
 const padsOf=c=>{const ps=S.pads.filter(p=>p.catId===c.id);return c.players?ps.slice().sort((a,b)=>(parseInt(a.nr)||999)-(parseInt(b.nr)||999)):ps};
@@ -911,13 +916,13 @@ $('#main').addEventListener('click',e=>{if(e.target.id==='rlDir'){const d=$('#rl
 ['rlDirIn','rlIn'].forEach(id=>$('#'+id).addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)relink(fs)}));
 
 /* ---------- Pads verschieben (Bearbeiten-Modus): gedrückt halten, ziehen, in andere Kategorie oder vor/hinter ein Pad fallen lassen ---------- */
-const DG={t:0,on:false,id:null,ghost:null,x:0,y:0,sx:0,sy:0,tgt:null,scroll:0,suppress:false};
+const DG={on:false,id:null,ghost:null,x:0,y:0,tgt:null,scroll:0,suppress:false,grip:null,pid:null};
 function dgTarget(x,y){DG.ghost.style.display='none';const el=document.elementFromPoint(x,y);DG.ghost.style.display='';
   const pad=el&&el.closest('.pad[data-pad]'),sec=el&&el.closest('.sec[data-cat]');
   document.querySelectorAll('.dropmark').forEach(e=>e.classList.remove('dropmark'));setOver(null);
   if(pad&&pad.dataset.pad!==DG.id){pad.classList.add('dropmark');const r=pad.getBoundingClientRect();return{pad:pad.dataset.pad,after:x>r.left+r.width/2,cat:sec&&sec.dataset.cat}}
   if(sec){setOver(sec);return{cat:sec.dataset.cat}}return null}
-function dgEnd(commit){clearTimeout(DG.t);cancelAnimationFrame(DG.scroll);
+function dgEnd(commit){cancelAnimationFrame(DG.scroll);document.body.classList.remove('dragging-now');
   if(DG.on){const src=document.querySelector(`.pad[data-pad="${DG.id}"]`);if(src)src.classList.remove('dragging');DG.ghost&&DG.ghost.remove();
     document.querySelectorAll('.dropmark').forEach(e=>e.classList.remove('dropmark'));setOver(null);
     const t=DG.tgt,p=S.pads.find(x=>x.id===DG.id);
@@ -925,21 +930,24 @@ function dgEnd(commit){clearTimeout(DG.t);cancelAnimationFrame(DG.scroll);
       if(t.pad){const tp=S.pads.find(x=>x.id===t.pad);p.catId=tp.catId;S.pads.splice(S.pads.indexOf(tp)+(t.after?1:0),0,p)}
       else{p.catId=t.cat;let last=-1;S.pads.forEach((x,k)=>{if(x.catId===t.cat)last=k});S.pads.splice(last+1,0,p)}
       save();render();toast('„'+p.name+'“ → '+catOf(p.catId).name)}
-    DG.suppress=true;setTimeout(()=>DG.suppress=false,350)}
-  DG.on=false;DG.id=null;DG.tgt=null;DG.ghost=null}
-function dgAuto(){const m=$('#main'),r=m.getBoundingClientRect();let v=0;if(DG.y<r.top+70)v=-14;else if(DG.y>r.bottom-70)v=14;if(v){m.scrollTop+=v;DG.tgt=dgTarget(DG.x,DG.y)}DG.scroll=requestAnimationFrame(dgAuto)}
-$('#main').addEventListener('pointerdown',e=>{if(!editMode)return;const pad=e.target.closest('.pad[data-pad]');if(!pad)return;
-  DG.id=pad.dataset.pad;DG.sx=DG.x=e.clientX;DG.sy=DG.y=e.clientY;
-  DG.t=setTimeout(()=>{DG.on=true;pad.classList.add('dragging');const g=pad.cloneNode(true);g.classList.add('ghost');g.classList.remove('dragging');g.style.left=DG.x+'px';g.style.top=DG.y+'px';document.body.appendChild(g);DG.ghost=g;
-    try{navigator.vibrate&&navigator.vibrate(15)}catch(x){}DG.scroll=requestAnimationFrame(dgAuto)},280)});
-document.addEventListener('pointermove',e=>{if(!DG.id)return;DG.x=e.clientX;DG.y=e.clientY;
-  if(!DG.on){if(Math.hypot(DG.x-DG.sx,DG.y-DG.sy)>10){clearTimeout(DG.t);DG.id=null}return}
-  DG.ghost.style.left=DG.x+'px';DG.ghost.style.top=DG.y+'px';DG.tgt=dgTarget(DG.x,DG.y)});
-document.addEventListener('pointerup',()=>{if(DG.id)dgEnd(true)});
-document.addEventListener('pointercancel',()=>{if(DG.id)dgEnd(false)});
+    DG.suppress=true;setTimeout(()=>DG.suppress=false,400)}
+  try{DG.grip&&DG.pid!=null&&DG.grip.releasePointerCapture(DG.pid)}catch(e){}
+  DG.on=false;DG.id=null;DG.tgt=null;DG.ghost=null;DG.grip=null;DG.pid=null}
+function dgAuto(){const m=$('#main'),r=m.getBoundingClientRect();let v=0;if(DG.y<r.top+80)v=-16;else if(DG.y>r.bottom-80)v=16;if(v){m.scrollTop+=v;DG.tgt=dgTarget(DG.x,DG.y)}DG.scroll=requestAnimationFrame(dgAuto)}
+/* Ziehen startet nur am Griff (☰ oben rechts) – sofort, ohne langes Drücken. touch-action:none am Griff verhindert, dass das iPad stattdessen scrollt. */
+$('#main').addEventListener('pointerdown',e=>{const g=e.target.closest('[data-grip]');if(!g||!editMode)return;e.preventDefault();e.stopPropagation();
+  const pad=g.closest('.pad[data-pad]');DG.id=pad.dataset.pad;DG.x=e.clientX;DG.y=e.clientY;DG.grip=g;DG.pid=e.pointerId;
+  try{g.setPointerCapture(e.pointerId)}catch(x){}
+  DG.on=true;document.body.classList.add('dragging-now');pad.classList.add('dragging');
+  const gh=pad.cloneNode(true);gh.classList.add('ghost');gh.classList.remove('dragging');gh.querySelector('.grip')?.remove();
+  gh.style.width=pad.offsetWidth+'px';gh.style.left=DG.x+'px';gh.style.top=DG.y+'px';document.body.appendChild(gh);DG.ghost=gh;
+  DG.scroll=requestAnimationFrame(dgAuto)});
+document.addEventListener('pointermove',e=>{if(!DG.on||e.pointerId!==DG.pid)return;e.preventDefault();DG.x=e.clientX;DG.y=e.clientY;
+  DG.ghost.style.left=DG.x+'px';DG.ghost.style.top=DG.y+'px';DG.tgt=dgTarget(DG.x,DG.y)},{passive:false});
+document.addEventListener('pointerup',e=>{if(DG.on&&e.pointerId===DG.pid)dgEnd(true)});
+document.addEventListener('pointercancel',e=>{if(DG.on&&e.pointerId===DG.pid)dgEnd(false)});
 document.addEventListener('touchmove',e=>{if(DG.on)e.preventDefault()},{passive:false});
-$('#main').addEventListener('click',e=>{if(DG.suppress){e.stopPropagation();e.preventDefault()}},true);
-$('#main').addEventListener('contextmenu',e=>{if(editMode)e.preventDefault()});
+$('#main').addEventListener('click',e=>{if(DG.suppress||e.target.closest('[data-grip]')){e.stopPropagation();e.preventDefault()}},true);
 
 /* ---------- WümmeTicker ---------- */
 /* Liest die offene Schnittstelle von wuemmeticker.web.app. Fällt das Netz aus, bleibt der letzte Stand stehen – das Board selbst ist davon nie betroffen. */
