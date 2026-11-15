@@ -58,7 +58,19 @@ button{cursor:pointer;border:0;background:none}
 .btn.fade{background:rgba(245,180,11,.13);color:#ffd77a;border-color:rgba(245,180,11,.3)}
 .btn.del{color:#ff8a8a}
 /* Rahmen */
-.wrap{flex:1;min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr);gap:12px;padding:12px}
+.wrap{flex:1;min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr);gap:12px;padding:12px;transition:grid-template-columns .25s}
+.wrap.slim{grid-template-columns:76px minmax(0,1fr)}
+.sidetg{flex:none;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#c6cdd8;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.wrap.slim .side>.panel{display:none}
+.rail{display:none;flex-direction:column;gap:8px;background:rgba(17,22,32,.82);border:1px solid var(--line);border-radius:14px;padding:8px}
+.wrap.slim .rail{display:flex}
+.rb{min-height:58px;border-radius:10px;font:400 19px/1 "Bebas Neue",Impact,sans-serif;letter-spacing:1px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:#dfe5ee}
+.rb.stopc{background:rgba(239,68,68,.16);color:#ffb4b4;border-color:rgba(239,68,68,.35)}
+.rb.fadec{background:rgba(245,180,11,.13);color:#ffd77a;border-color:rgba(245,180,11,.3)}
+.rb.micb.on{background:#fff;color:#000;animation:micp 1s ease-in-out infinite}
+.rlive{display:grid;gap:6px}
+.rlive i{display:block;height:6px;border-radius:3px;background:var(--c);animation:dot 1s infinite}
+.rlive b{display:block;text-align:center;font:400 22px/1 "Bebas Neue",Impact,sans-serif;padding:6px 0;border-radius:8px;background:rgba(0,0,0,.3)}
 .side{display:flex;flex-direction:column;gap:12px;overflow-y:auto;min-height:0;scrollbar-width:none}
 .panel{background:rgba(17,22,32,.82);border:1px solid var(--line);border-radius:14px;padding:14px}
 .ph{display:flex;justify-content:space-between;align-items:center;font:700 11px Manrope;letter-spacing:2.2px;color:var(--mute);margin-bottom:10px}
@@ -117,6 +129,7 @@ input[type=range]{flex:1;height:40px;accent-color:#14b8a6;background:none}
 .pad.dragging{opacity:.25}
 .pad.ghost,.ghost{position:fixed;margin:0;z-index:40;pointer-events:none;max-width:200px;transform:translate(-50%,-50%) rotate(-3deg) scale(1.05);box-shadow:0 18px 40px rgba(0,0,0,.6);opacity:.95}
 .dropmark{outline:3px solid #fff;outline-offset:2px}
+.tab.dropmark{outline-offset:-2px;background:#fff;color:#000;transform:scale(1.08)}
 .grip{position:absolute;z-index:3;top:5px;right:5px;width:42px;height:42px;border-radius:9px;background:rgba(0,0,0,.42);display:grid;align-content:center;justify-items:center;gap:4px;touch-action:none;cursor:grab}
 .grip i{display:block;width:18px;height:2.5px;border-radius:2px;background:#fff}
 .pad.pl .grip{top:4px;right:4px;width:36px;height:36px}
@@ -247,6 +260,7 @@ details .in{padding:2px 16px 14px}
 </head>
 <body>
 <header class="top">
+  <button class="sidetg" id="bSide" aria-label="Seitenleiste ein- oder ausklappen"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
   <div class="brand"><img id="logo" alt="Vereinslogo" hidden><span class="ico"><i style="background:#14b8a6"></i><i style="background:#22c55e"></i><i style="background:#eab308"></i><i style="background:#0ea5e9"></i><i style="background:#a855f7"></i><i style="background:#f97316"></i><i style="background:#ec4899"></i><i style="background:#6366f1"></i><i style="background:#ef4444"></i></span><span class="bt">Hallen-DJ</span></div>
   <nav class="tabs" id="tabs"></nav>
   <div class="tools">
@@ -258,6 +272,12 @@ details .in{padding:2px 16px 14px}
 </header>
 <div class="wrap">
   <aside class="side">
+    <div class="rail">
+      <button class="rb stopc" id="rStop">STOP</button>
+      <button class="rb fadec" id="rFade">AUS</button>
+      <button class="rb micb" id="rMic">MIC</button>
+      <div class="rlive" id="rLive"></div>
+    </div>
     <section class="panel" id="tkP">
       <div class="ph">WÜMMETICKER <span class="stat" id="tkSt">LÄDT</span></div>
       <div id="tk"><div class="tkmsg">Spielstände werden geladen …</div></div>
@@ -452,7 +472,7 @@ const stopAll=()=>{for(const id of [...playing.keys()]){lg(id,'Stopp: STOP gedr�
 let ducked=false;
 function duck(on){if(on===ducked)return;ducked=on;const t=ctx.currentTime,lv=Math.max(.02,(S.settings.duck??20)/100);
   duckG.gain.cancelScheduledValues(t);duckG.gain.setValueAtTime(duckG.gain.value,t);duckG.gain.linearRampToValueAtTime(on?lv:1,t+(on?.25:.9));
-  const b=document.getElementById('bMic');if(b){b.classList.toggle('on',on);b.textContent=on?'Sprecher AN':'Sprecher'}}
+  const b=document.getElementById('bMic');if(b){b.classList.toggle('on',on);b.textContent=on?'Sprecher AN':'Sprecher'}const rm=document.getElementById('rMic');if(rm)rm.classList.toggle('on',on)}
 
 /* Protokoll: warum ein Sound gestartet/beendet wurde – für die Fehlersuche (Einstellungen → Diagnose) */
 const LOG=[];const nm=id=>{const p=S.pads.find(x=>x.id===id);return p?p.name:id==='pv'?'Vorhören':'?'};
@@ -516,6 +536,7 @@ function updDecks(){if(!S.settings.mixer)return;const nx=autoDeck();
 function renderNow(){
   renderTabs();updDecks();
   const items=[...playing.entries()].filter(([k])=>k!=='pv');
+  const rl=$('#rLive');if(rl){const sc=(TK.games||[]).find(g=>g.live);rl.innerHTML=items.map(([id])=>{const p=S.pads.find(x=>x.id===id);return p?`<i style="--c:${colorOf(p)}"></i>`:''}).join('')+(sc?`<b>${sc.sh}:${sc.sg}</b>`:'')}
   const st=$('#stat');st.textContent=items.length?(items.length>1?items.length+' AKTIV':'LÄUFT'):'BEREIT';st.classList.toggle('live',!!items.length);
   $('#now').innerHTML=(items.length?items.map(([id])=>{const p=S.pads.find(x=>x.id===id);if(!p)return'';
     return `<button class="chip" style="--c:${colorOf(p)}" data-chip="${id}"><b>${isPl(p)&&p.nr?'#'+esc(p.nr)+' ':''}${esc(p.name)}</b><div class="bar"><i></i></div><span><em>antippen = ausblenden</em><strong class="rm"></strong></span></button>`}).join(''):'<span class="idle">Kein Sound aktiv – Pad antippen zum Starten.</span>')
@@ -885,6 +906,11 @@ async function doImport(){
   imBusy=false;await save();render();renderImp();
   toast(`${todo.length-bad} Sounds importiert`+(bad?` · ${bad} nicht lesbar`:''));if(!IM.length)$('#ovImp').classList.remove('open')}
 $('#bImp2').onclick=openImp;
+function applySide(){$('.wrap').classList.toggle('slim',!!S.settings.slim)}
+$('#bSide').onclick=()=>{S.settings.slim=!S.settings.slim;save();applySide()};
+$('#rStop').onclick=()=>stopAll();$('#rFade').onclick=()=>fadeAll();
+$('#rMic').addEventListener('pointerdown',e=>{e.preventDefault();unlock();try{e.target.setPointerCapture(e.pointerId)}catch(x){}if(S.settings.duckMode==='toggle')duck(!ducked);else duck(true)});
+['pointerup','pointercancel','lostpointercapture'].forEach(n=>$('#rMic').addEventListener(n,()=>{if(S.settings.duckMode!=='toggle')duck(false)}));
 $('#bMic').addEventListener('pointerdown',e=>{e.preventDefault();unlock();try{e.target.setPointerCapture(e.pointerId)}catch(x){}if(S.settings.duckMode==='toggle')duck(!ducked);else duck(true)});
 ['pointerup','pointercancel','lostpointercapture'].forEach(n=>$('#bMic').addEventListener(n,()=>{if(S.settings.duckMode!=='toggle')duck(false)}));
 $('#bMic').addEventListener('contextmenu',e=>e.preventDefault());
@@ -918,10 +944,12 @@ $('#dImp').addEventListener('change',e=>{const t=e.target,d=t.dataset;
 $('#dImp').addEventListener('input',e=>{const d=e.target.dataset;if(d.in){const x=IM.find(y=>y.id===d.in);x.name=e.target.value}});
 let overSec=null;const setOver=s=>{if(overSec&&overSec!==s)overSec.classList.remove('over');overSec=s;if(s)s.classList.add('over')};
 ['dragover','dragenter'].forEach(ev=>document.addEventListener(ev,e=>{if(e.dataTransfer&&[...e.dataTransfer.types].includes('Files')){e.preventDefault();const z=$('#iDrop');if(z)z.classList.add('over');
-  setOver(document.querySelector('.ov.open')?null:e.target.closest&&e.target.closest('.sec[data-cat]'))}}));
-document.addEventListener('dragleave',e=>{if(!e.relatedTarget)setOver(null)});
+  const ov=document.querySelector('.ov.open'),tb=!ov&&e.target.closest&&e.target.closest('.tab[data-tab]');document.querySelectorAll('.tab.dropmark').forEach(x=>{if(x!==tb)x.classList.remove('dropmark')});if(tb&&tb.dataset.tab!=='all')tb.classList.add('dropmark');
+  setOver(ov||tb?null:e.target.closest&&e.target.closest('.sec[data-cat]'))}}));
+document.addEventListener('dragleave',e=>{if(!e.relatedTarget){setOver(null);document.querySelectorAll('.tab.dropmark').forEach(x=>x.classList.remove('dropmark'))}});
 document.addEventListener('drop',async e=>{if(!e.dataTransfer||!e.dataTransfer.files.length&&!e.dataTransfer.items.length)return;e.preventDefault();
-  const sec=document.querySelector('.ov.open')?null:e.target.closest&&e.target.closest('.sec[data-cat]');setOver(null);
+  const ov=document.querySelector('.ov.open'),tb=!ov&&e.target.closest&&e.target.closest('.tab[data-tab]');
+  const sec=ov?null:(tb&&tb.dataset.tab!=='all')?{dataset:{cat:tb.dataset.tab}}:e.target.closest&&e.target.closest('.sec[data-cat]');setOver(null);document.querySelectorAll('.tab.dropmark').forEach(x=>x.classList.remove('dropmark'));
   const list=await readDrop(e.dataTransfer);
   if(sec){const fs=list.map(x=>x.file||x).filter(isAudio);if(!fs.length){toast('Keine Audiodateien erkannt');return}
     const c=catOf(sec.dataset.cat);toast(`${fs.length} ${fs.length===1?'Song':'Songs'} → ${c.name} …`);await addFiles(fs,c.id);
@@ -934,8 +962,9 @@ $('#main').addEventListener('click',e=>{if(e.target.id==='rlDir'){const d=$('#rl
 /* ---------- Pads verschieben (Bearbeiten-Modus): gedrückt halten, ziehen, in andere Kategorie oder vor/hinter ein Pad fallen lassen ---------- */
 const DG={on:false,id:null,ghost:null,x:0,y:0,tgt:null,scroll:0,suppress:false,grip:null,pid:null};
 function dgTarget(x,y){DG.ghost.style.display='none';const el=document.elementFromPoint(x,y);DG.ghost.style.display='';
-  const pad=el&&el.closest('.pad[data-pad]'),sec=el&&el.closest('.sec[data-cat]');
+  const pad=el&&el.closest('.pad[data-pad]'),sec=el&&el.closest('.sec[data-cat]'),tab=el&&el.closest('.tab[data-tab]');
   document.querySelectorAll('.dropmark').forEach(e=>e.classList.remove('dropmark'));setOver(null);
+  if(tab&&tab.dataset.tab!=='all'){tab.classList.add('dropmark');return{cat:tab.dataset.tab}}
   if(pad&&pad.dataset.pad!==DG.id){pad.classList.add('dropmark');const r=pad.getBoundingClientRect();return{pad:pad.dataset.pad,after:x>r.left+r.width/2,cat:sec&&sec.dataset.cat}}
   if(sec){setOver(sec);return{cat:sec.dataset.cat}}return null}
 function dgEnd(commit){cancelAnimationFrame(DG.scroll);document.body.classList.remove('dragging-now');
@@ -949,7 +978,7 @@ function dgEnd(commit){cancelAnimationFrame(DG.scroll);document.body.classList.r
     DG.suppress=true;setTimeout(()=>DG.suppress=false,400)}
   try{DG.grip&&DG.pid!=null&&DG.grip.releasePointerCapture(DG.pid)}catch(e){}
   DG.on=false;DG.id=null;DG.tgt=null;DG.ghost=null;DG.grip=null;DG.pid=null}
-function dgAuto(){const m=$('#main'),r=m.getBoundingClientRect();let v=0;if(DG.y<r.top+80)v=-16;else if(DG.y>r.bottom-80)v=16;if(v){m.scrollTop+=v;DG.tgt=dgTarget(DG.x,DG.y)}DG.scroll=requestAnimationFrame(dgAuto)}
+function dgAuto(){const m=$('#main'),r=m.getBoundingClientRect();let v=0;if(DG.y>r.top&&DG.y<r.top+80)v=-16;else if(DG.y>r.bottom-80)v=16;if(v){m.scrollTop+=v;DG.tgt=dgTarget(DG.x,DG.y)}DG.scroll=requestAnimationFrame(dgAuto)}
 /* Ziehen startet nur am Griff (☰ oben rechts) – sofort, ohne langes Drücken. touch-action:none am Griff verhindert, dass das iPad stattdessen scrollt. */
 $('#main').addEventListener('pointerdown',e=>{const g=e.target.closest('[data-grip]');if(!g||!editMode)return;e.preventDefault();e.stopPropagation();
   const pad=g.closest('.pad[data-pad]');DG.id=pad.dataset.pad;DG.x=e.clientX;DG.y=e.clientY;DG.grip=g;DG.pid=e.pointerId;
@@ -1006,7 +1035,7 @@ function drawTk(){const box=$('#tk'),st=$('#tkSt');
     const us=n=>n===g.team.name?'us':'';
     return `<div class="tg ${cls}"><div class="lg"><span>${esc(g.team.clubShort||'')} ${esc(g.team.label)}</span><span>${g.next?'Nächstes Spiel':esc(g.team.league||'')}</span></div>
       <div class="tm2 ${us(g.home)}">${img(g.homeImg)}<span>${esc(g.home)}</span></div><div class="sc ${changed?'flash':''}">${mid}</div><div class="tm2 ${us(g.guest)}">${img(g.guestImg)}<span>${esc(g.guest)}</span></div></div>`}).join('')+
-    (TK.games.length>3?`<div class="tkmore">+ ${TK.games.length-3} weitere Spiele heute</div>`:'')}
+    (TK.games.length>3?`<div class="tkmore">+ ${TK.games.length-3} weitere Spiele heute</div>`:'');try{renderNow()}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')tkLoad()});
 window.addEventListener('online',()=>tkLoad());
 
@@ -1028,7 +1057,7 @@ try{if('serviceWorker' in navigator&&location.protocol==='https:'&&window.top===
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   $('#mv').value=S.settings.master;$('#mvo').textContent=S.settings.master;master.gain.value=vol(S.settings.master);
   try{const lg=await get('logo');if(lg)showLogo(lg)}catch(e){}
-  showMixer();tkLoad();checkMissing().then(s=>{if(s.size)render()});
+  showMixer();applySide();tkLoad();checkMissing().then(s=>{if(s.size)render()});
   render();renderNow();
   preloadAll(); // nacheinander laden = wenig Speicherspitze
 })();
