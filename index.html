@@ -122,6 +122,8 @@ input[type=range]{flex:1;height:40px;accent-color:#14b8a6;background:none}
 .pad.pl .grip{top:4px;right:4px;width:36px;height:36px}
 body.dragging-now,body.dragging-now *{cursor:grabbing!important}
 .editing .pad[data-pad]:not(.pl) .nm{padding-right:42px}
+.diag{max-height:260px;overflow-y:auto;font:500 12.5px/1.5 Manrope;background:#05070b;border:1px solid var(--line);border-radius:10px;padding:10px;color:#c6cdd8;-webkit-user-select:text;user-select:text}
+.diag b{color:var(--mute);font-weight:700;font-variant-numeric:tabular-nums}
 /* Board */
 main{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:12px;padding-bottom:12px;scrollbar-width:thin}
 .sec{background:rgba(17,22,32,.82);border:1px solid var(--line);border-radius:16px;overflow:hidden;flex:none}
@@ -393,7 +395,7 @@ function unlockMedia(){for(const s of SND.values())if(s.kind==='media'&&!s.ok&&!
 const unlock=()=>{if(ctx.state!=='running')ctx.resume().catch(()=>{});unlockMedia();keepAwake()};
 let wl=null;async function keepAwake(){try{if(!wl&&navigator.wakeLock){wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>wl=null)}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){keepAwake();if(ctx.state!=='running')ctx.resume().catch(()=>{})}});
-ctx.onstatechange=()=>{if(ctx.state!=='running'&&playing.size)toast('Audio wurde vom iPad unterbrochen – Pad antippen zum Fortsetzen')};
+ctx.onstatechange=()=>{if(ctx.state!=='running'&&playing.size){toast('Audio wurde vom iPad unterbrochen – Pad antippen zum Fortsetzen');LOG.push({t:new Date(),n:'iPad',ev:'Audio unterbrochen ('+ctx.state+')'})}};
 
 function play(p,preview){
   unlock();if(!p.soundId){if(!preview)openPad(p.id);return}
@@ -405,8 +407,8 @@ function play(p,preview){
 function start(p,s,preview){try{
   if(!p.dur){p.dur=s.dur;save()}
   let dest=master,dk=null;
-  if(!preview&&S.settings.mixer){dk=autoDeck();const prev=MX.deck[dk];if(prev&&prev!==p.id&&playing.has(prev))fade(prev,.35);for(const d of['A','B'])if(MX.deck[d]===p.id)MX.deck[d]=null;MX.deck[dk]=p.id;MX.target=null;dest=DK[dk]}
-  else if(!preview){for(const [id] of playing){const op=S.pads.find(x=>x.id===id);if(p.excl==='all'||(p.excl==='cat'&&op&&op.catId===p.catId))fade(id)}}
+  if(!preview&&S.settings.mixer){dk=autoDeck();const prev=MX.deck[dk];if(prev&&prev!==p.id&&playing.has(prev)){lg(prev,'Ausgeblendet: Deck '+dk+' neu belegt');fade(prev,.35)}const lv=dk==='A'?Math.cos(MX.x*Math.PI/2):Math.sin(MX.x*Math.PI/2);if(lv<.15)toast('„'+p.name+'“ startet auf Deck '+dk+' – Regler rüberschieben, sonst hört man nichts');for(const d of['A','B'])if(MX.deck[d]===p.id)MX.deck[d]=null;MX.deck[dk]=p.id;MX.target=null;dest=DK[dk]}
+  else if(!preview){for(const [id] of playing){const op=S.pads.find(x=>x.id===id);if(id!==p.id&&(p.excl==='all'||(p.excl==='cat'&&op&&op.catId===p.catId))){lg(id,'Ausgeblendet, weil „'+p.name+'“ gestartet wurde'+(p.excl==='all'?' (alle anderen ausblenden)':' (gleiche Kategorie)'));fade(id)}}}
   const key=preview?'pv':p.id;
   if(playing.has(key))kill(key);
   if(s.kind==='media')for(const [k,o] of playing)if(o.s===s)kill(k);
@@ -415,15 +417,17 @@ function start(p,s,preview){try{
   const now=ctx.currentTime,v=vol(p.vol)*Math.pow(10,normDb(p.soundId)/20);
   if(p.fadeIn>0){g.gain.setValueAtTime(0.0001,now);g.gain.linearRampToValueAtTime(v,now+p.fadeIn)}else g.gain.setValueAtTime(v,now);
   if(!p.loop&&p.fadeOut>0&&len>p.fadeOut*2){g.gain.setValueAtTime(v,now+len-p.fadeOut);g.gain.linearRampToValueAtTime(0.0001,now+len)}
-  const o={s,g,t0:now,st,en,len,loop:p.loop,fading:false,dk,key};
+  const o={s,g,t0:now,st,en,len,loop:p.loop,fading:false,dk,key,ms:performance.now(),started:s.kind==='buf'};lg(key,'Start'+(dk?' auf Deck '+dk:'')+(s.kind==='media'?' (gestreamt)':''));
   if(s.kind==='buf'){const src=ctx.createBufferSource();src.buffer=s.buf;src.connect(g);o.src=src;
     if(p.loop){src.loop=true;src.loopStart=st;src.loopEnd=en;src.start(now,st)}else src.start(now,st,len);
-    src.onended=()=>end(o)}
+    src.onended=()=>{if(playing.get(key)===o&&!o.fading)lg(key,'Ende: Song zu Ende');end(o)}}
   else{const el=s.el;s.live=true;el.muted=false;
     if(s.node){try{s.node.disconnect()}catch(e){}s.node.connect(g)}else el.volume=Math.min(1,v);
     try{el.currentTime=st}catch(e){}
-    el.onended=()=>{if(o.loop&&!o.fading&&playing.get(key)===o){try{el.currentTime=o.st}catch(e){}el.play().catch(()=>{});return}end(o)};
-    const pr=el.play();if(pr&&pr.catch)pr.catch(()=>{if(playing.get(key)===o){toast('iPad hat den Start blockiert – Pad nochmal antippen');end(o)}})}
+    if(el.readyState<1)el.addEventListener('loadedmetadata',()=>{if(playing.get(key)===o){try{el.currentTime=st}catch(e){}}},{once:true});
+    el.addEventListener('playing',()=>{o.started=true},{once:true});
+    el.onended=()=>{if(o.loop&&!o.fading&&playing.get(key)===o){try{el.currentTime=o.st}catch(e){}el.play().catch(()=>{});return}lg(key,'Ende: Song zu Ende');end(o)};
+    const pr=el.play();if(pr&&pr.catch)pr.catch(()=>{if(playing.get(key)===o){toast('iPad hat den Start blockiert – Pad nochmal antippen');lg(key,'Fehler: Start vom iPad blockiert');end(o)}})}
   playing.set(key,o);renderNow();paint()
 }catch(e){console.error(e);toast('Fehler beim Abspielen von „'+p.name+'“')}}
 function cleanup(o){clearTimeout(o.tm);
@@ -432,15 +436,17 @@ function cleanup(o){clearTimeout(o.tm);
   setTimeout(()=>{try{o.g.disconnect()}catch(e){}},50)}
 function end(o){if(playing.get(o.key)!==o)return;playing.delete(o.key);cleanup(o);if(o.dk&&MX.deck[o.dk]===o.key)MX.deck[o.dk]=null;renderNow();paint()}
 const pos=o=>{if(o.s.kind==='media')return Math.max(0,Math.min(o.len,o.s.el.currentTime-o.st));const e=ctx.currentTime-o.t0;return o.loop?e%o.len:Math.min(e,o.len)};
-function tickMedia(){for(const o of playing.values())if(o.s.kind==='media'&&o.en<o.s.dur-.05&&o.s.el.currentTime>=o.en-.02){if(o.loop&&!o.fading){try{o.s.el.currentTime=o.st}catch(e){}}else if(!o.fading)end(o)}}
+function tickMedia(){for(const o of playing.values()){if(o.s.kind!=='media'||!o.started||o.fading)continue;const ct=o.s.el.currentTime;
+  /* nur beenden, wenn der Song wirklich vom Startpunkt bis zum Endpunkt gelaufen ist – nicht, weil ein alter Abspielstand noch drinsteht */
+  if(o.en<o.s.dur-.05&&ct>=o.en-.02&&ct>o.st+.2&&performance.now()-o.ms>300){if(o.loop){try{o.s.el.currentTime=o.st}catch(e){}}else{lg(o.key,'Ende: Endpunkt erreicht');end(o)}}}}
 function fade(id,t){const o=playing.get(id);if(!o||o.fading)return;const p=S.pads.find(x=>x.id===id);
   t=t??(p?p.fadeOut:1);t=Math.max(t,.03);const now=ctx.currentTime;o.fading=true;
   o.g.gain.cancelScheduledValues(now);o.g.gain.setValueAtTime(Math.max(.0001,o.g.gain.value),now);o.g.gain.linearRampToValueAtTime(0.0001,now+t);
   if(o.s.kind==='buf'){try{o.src.stop(now+t+.02)}catch(e){}}else o.tm=setTimeout(()=>end(o),(t+.05)*1000);
   renderNow();paint()}
 function kill(id){const o=playing.get(id);if(!o)return;playing.delete(id);cleanup(o);if(o.dk&&MX.deck[o.dk]===id)MX.deck[o.dk]=null}
-const fadeAll=()=>{for(const id of [...playing.keys()])fade(id,S.settings.fadeAll)};
-const stopAll=()=>{for(const id of [...playing.keys()])kill(id);renderNow();paint()};
+const fadeAll=()=>{for(const id of [...playing.keys()]){lg(id,'Ausgeblendet: „Ausblenden“ gedrückt');fade(id,S.settings.fadeAll)}};
+const stopAll=()=>{for(const id of [...playing.keys()]){lg(id,'Stopp: STOP gedrückt');kill(id)}renderNow();paint()};
 
 /* Sprecher-Taste */
 let ducked=false;
@@ -448,11 +454,16 @@ function duck(on){if(on===ducked)return;ducked=on;const t=ctx.currentTime,lv=Mat
   duckG.gain.cancelScheduledValues(t);duckG.gain.setValueAtTime(duckG.gain.value,t);duckG.gain.linearRampToValueAtTime(on?lv:1,t+(on?.25:.9));
   const b=document.getElementById('bMic');if(b){b.classList.toggle('on',on);b.textContent=on?'Sprecher AN':'Sprecher'}}
 
+/* Protokoll: warum ein Sound gestartet/beendet wurde – für die Fehlersuche (Einstellungen → Diagnose) */
+const LOG=[];const nm=id=>{const p=S.pads.find(x=>x.id===id);return p?p.name:id==='pv'?'Vorhören':'?'};
+function lg(id,ev){LOG.push({t:new Date(),n:nm(id),ev});if(LOG.length>80)LOG.shift()}
 function tapPad(id){
   const p=S.pads.find(x=>x.id===id);if(!p)return;
   if(editMode)return openPad(id);
-  if(playing.has(id)&&!playing.get(id).fading){const a=S.settings.tap;
-    if(a==='fade')return fade(id);if(a==='stop'){kill(id);renderNow();paint();return}}
+  const o=playing.get(id),nowMs=performance.now();
+  if(o&&nowMs-o.ms<(S.settings.guard??800)){lg(id,'Doppeltipp ignoriert ('+Math.round(nowMs-o.ms)+' ms nach Start)');return}
+  if(o&&!o.fading){const a=S.settings.tap;
+    if(a==='fade'){lg(id,'Stopp: angetippt (ausblenden)');return fade(id)}if(a==='stop'){lg(id,'Stopp: angetippt');kill(id);renderNow();paint();return}}
   play(p)
 }
 window.addEventListener('error',e=>{console.error(e.error||e.message);toast('Fehler abgefangen: '+String(e.message||e.error||'').slice(0,80))});
@@ -587,12 +598,16 @@ function openSet(){const s=S.settings;
   <details><summary>Bedienung</summary><div class="in">
    <label class="fld"><span>Antippen eines laufenden Pads</span><select id="sTap"><option value="fade" ${s.tap==='fade'?'selected':''}>Ausblenden (Fade-Out des Pads)</option><option value="stop" ${s.tap==='stop'?'selected':''}>Sofort stoppen</option><option value="restart" ${s.tap==='restart'?'selected':''}>Von vorne starten</option></select></label>
    ${slider('sFa','„Alle ausblenden“ Dauer',s.fadeAll,.5,8,.5,' s')}
+   ${slider('sGuard','Schutz gegen Doppeltippen',s.guard??800,0,2000,100,' ms')}
    ${slider('sXf','Auto-Übergang im Mixer',s.xfade??4,1,15,.5,' s')}
    <label class="chk"><input type="checkbox" id="sNorm" ${s.norm!==false?'checked':''}> Lautstärke aller Sounds automatisch angleichen</label>
    ${slider('sDuck','Sprecher-Taste senkt Musik auf',s.duck??20,5,60,5,' %')}
    <label class="fld"><span>Sprecher-Taste</span><select id="sDm"><option value="hold" ${s.duckMode!=='toggle'?'selected':''}>Gedrückt halten</option><option value="toggle" ${s.duckMode==='toggle'?'selected':''}>Antippen = an / aus</option></select></label>
    ${slider('sCols','Pads pro Reihe (iPad quer)',s.cols,3,8,1,'')}
   </div></details>
+  <details><summary>Diagnose</summary><div class="in"><p class="hint">Hier steht, warum ein Sound gestartet oder beendet wurde – die letzten 80 Ereignisse, neueste oben. Bricht ein Sound unerwartet ab, hier nachschauen oder mir den Text schicken.</p>
+   <div class="diag">${LOG.length?LOG.slice().reverse().map(x=>`<div><b>${x.t.toLocaleTimeString('de-DE')}</b> ${esc(x.n)} – ${esc(x.ev)}</div>`).join(''):'<div>Noch keine Ereignisse.</div>'}</div>
+   <div class="acts"><button class="btn" id="bDiag">Als Text kopieren</button></div></div></details>
   <details><summary>WümmeTicker</summary><div class="in">
    <label class="chk"><input type="checkbox" id="sTk" ${s.tk!==false?'checked':''}> Spielstände links in der Seitenleiste zeigen</label>
    <label class="fld"><span>Mannschaft</span><select id="sTkT"><option value="">Alle Mannschaften – heutige Spiele</option>${(TK.club?.teams||[]).map(t=>{const v=t.group+'|'+t.label;return `<option value="${esc(v)}" ${tkSel()===v?'selected':''}>${esc(t.clubShort+' '+t.label)} · ${esc(t.league)}</option>`}).join('')}</select></label>
@@ -712,7 +727,7 @@ $('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-newcat]')){op
   S.settings.tab=id;save();render();if(editMode&&id!=='all')toast('Nochmal tippen zum Umbenennen')});
 $('#main').addEventListener('click',e=>{const a=e.target.closest('[data-add]');if(a){const c=catOf(a.dataset.add);if(c&&c.players&&c.id===a.dataset.add){const np=mk(c,'Neuer Spieler',null,{nr:''});S.pads.push(np);save();render();openPad(np.id);return}pendingAdd={cat:a.dataset.add};$('#fileIn').click();return}
   const p=e.target.closest('[data-pad]');if(p)tapPad(p.dataset.pad)});
-$('#now').addEventListener('click',e=>{const c=e.target.closest('[data-chip]');if(c)fade(c.dataset.chip)});
+$('#now').addEventListener('click',e=>{const c=e.target.closest('[data-chip]');if(c){const o=playing.get(c.dataset.chip);if(o&&performance.now()-o.ms<(S.settings.guard??800))return;lg(c.dataset.chip,'Stopp: in „Jetzt läuft“ angetippt');fade(c.dataset.chip)}});
 $('#fileIn').addEventListener('change',async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length||!pendingAdd)return;
   const pa=pendingAdd;pendingAdd=null;
   if(pa.replace){readPad();await addFiles(fs.slice(0,1),null,pa.replace);openPad(pa.replace)}
@@ -740,7 +755,7 @@ $('#dPad').addEventListener('click',async e=>{const t=e.target.closest('button')
 $('#ovSet').addEventListener('click',e=>{if(e.target.id==='ovSet'){$('#ovSet').classList.remove('open');render()}});
 $('#dSet').addEventListener('input',e=>{const t=e.target,s=S.settings;
   if(t.type==='range')$('#'+t.id+'o').textContent=t.value+t.dataset.u;
-  if(t.id==='sFa')s.fadeAll=+t.value;if(t.id==='sXf')s.xfade=+t.value;if(t.id==='sNorm')s.norm=t.checked;if(t.id==='sDuck')s.duck=+t.value;if(t.id==='sCols')s.cols=+t.value;if(t.id==='sTap')s.tap=t.value;
+  if(t.id==='sFa')s.fadeAll=+t.value;if(t.id==='sXf')s.xfade=+t.value;if(t.id==='sGuard')s.guard=+t.value;if(t.id==='sNorm')s.norm=t.checked;if(t.id==='sDuck')s.duck=+t.value;if(t.id==='sCols')s.cols=+t.value;if(t.id==='sTap')s.tap=t.value;
   if(t.dataset.cn){const c=S.cats.find(x=>x.id===t.dataset.cn);c.name=t.value||'Kategorie'}save()});
 $('#dSet').addEventListener('change',e=>{if(e.target.id==='sTk'){S.settings.tk=e.target.checked;save();tkLoad()}if(e.target.id==='sTkT'){S.settings.tkTeam=e.target.value;TK.prev={};save();tkLoad()}if(e.target.id==='sTap'){S.settings.tap=e.target.value;save()}if(e.target.id==='sDm'){S.settings.duckMode=e.target.value;duck(false);save()}if(e.target.id==='sNorm'){S.settings.norm=e.target.checked;save()}});
 $('#dSet').addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
@@ -753,6 +768,7 @@ $('#dSet').addEventListener('click',async e=>{const t=e.target.closest('button')
     S.cats=S.cats.filter(x=>x.id!==d.cx);S.pads.forEach(p=>{if(p.catId===d.cx)p.catId=S.cats[0].id});if(S.settings.tab===d.cx)S.settings.tab='all';renderCats()}
   if(t.id==='lgPick'){$('#logoIn').click();return}
   if(t.id==='lgDel'){await del('logo');showLogo(null);openSet();return}
+  if(t.id==='bDiag'){const txt=LOG.map(x=>x.t.toLocaleTimeString('de-DE')+' '+x.n+' – '+x.ev).join('\n')+'\nAudio: '+ctx.state+' · Mixer: '+(S.settings.mixer?'an':'aus')+' · Antippen: '+S.settings.tap+' · '+navigator.userAgent;try{await navigator.clipboard.writeText(txt);toast('Protokoll kopiert')}catch(e){toast('Kopieren nicht möglich')}return}
   if(t.id==='bExpL')exportLight();
   if(t.id==='bExp')exportBak();
   if(t.id==='bImp')$('#bakIn').click();
