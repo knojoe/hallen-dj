@@ -61,17 +61,7 @@ button{cursor:pointer;border:0;background:none}
 .wrap{flex:1;min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr);gap:12px;padding:12px;transition:grid-template-columns .25s}
 .wrap.slim{grid-template-columns:76px minmax(0,1fr)}
 .sidetg{flex:none;width:44px;height:44px;border-radius:10px;display:grid;place-items:center;color:#c6cdd8;background:rgba(255,255,255,.05);border:1px solid var(--line)}
-.wrap.slim .side>.panel{display:none}
-.rail{display:none;flex-direction:column;gap:8px;background:rgba(17,22,32,.82);border:1px solid var(--line);border-radius:14px;padding:8px}
-.wrap.slim .rail{display:flex}
-.rb{min-height:58px;border-radius:10px;font:400 19px/1 "Bebas Neue",Impact,sans-serif;letter-spacing:1px;border:1px solid var(--line);background:rgba(255,255,255,.05);color:#dfe5ee}
-.rb.stopc{background:rgba(239,68,68,.16);color:#ffb4b4;border-color:rgba(239,68,68,.35)}
-.rb.fadec{background:rgba(245,180,11,.13);color:#ffd77a;border-color:rgba(245,180,11,.3)}
-.rb.micb.on{background:#fff;color:#000;animation:micp 1s ease-in-out infinite}
-.rlive{display:grid;gap:6px}
-.rlive i{display:block;height:6px;border-radius:3px;background:var(--c);animation:dot 1s infinite}
-.rlive b{display:block;text-align:center;font:400 22px/1 "Bebas Neue",Impact,sans-serif;padding:6px 0;border-radius:8px;background:rgba(0,0,0,.3)}
-.side{display:flex;flex-direction:column;gap:12px;overflow-y:auto;min-height:0;scrollbar-width:none}
+.wrap.slim .side{display:flex;flex-direction:column;gap:12px;overflow-y:auto;min-height:0;scrollbar-width:none}
 .panel{background:rgba(17,22,32,.82);border:1px solid var(--line);border-radius:14px;padding:14px}
 .ph{display:flex;justify-content:space-between;align-items:center;font:700 11px Manrope;letter-spacing:2.2px;color:var(--mute);margin-bottom:10px}
 .stat{font:700 10.5px Manrope;letter-spacing:1px;padding:3px 9px;border-radius:99px;background:rgba(255,255,255,.07);color:var(--mute)}
@@ -172,28 +162,6 @@ main{overflow-y:auto;min-height:0;display:flex;flex-direction:column;gap:12px;pa
 .pad.pl.play .tm{font-size:15px}
 .pad.pl .off{left:50%;bottom:auto;transform:translateX(-50%);top:7px}
 .empty-st{padding:40px 10px;text-align:center;color:var(--mute)}
-/* Mixer */
-.mixer{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) minmax(0,1fr);gap:12px;align-items:center;padding:12px 14px;margin:0 12px calc(12px + env(safe-area-inset-bottom));background:rgba(17,22,32,.9);border:1px solid var(--line);border-radius:16px}
-.mixer[hidden]{display:none}
-.deck{position:relative;overflow:hidden;display:grid;gap:3px;text-align:left;padding:10px 14px 12px;min-height:80px;border-radius:12px;background:rgba(0,0,0,.3);border:1px solid var(--line)}
-.deck .dl{font:700 10.5px Manrope;letter-spacing:2px;color:var(--mute);display:flex;justify-content:space-between}
-.deck .dl em{font-style:normal;color:#fff}
-.deck .dn{font:800 16px/1.2 Manrope;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.deck .dt{font:700 13px Manrope;color:var(--mute);font-variant-numeric:tabular-nums}
-.deck .dbar{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--c,#fff)}
-.deck .lvl{position:absolute;right:0;top:0;bottom:0;width:4px;background:rgba(255,255,255,.06)}
-.deck .lvl i{position:absolute;left:0;right:0;bottom:0;background:var(--c,#fff)}
-.deck.live{border-color:var(--c);animation:pulse 1s ease-in-out infinite}
-.deck.tgt{outline:2px dashed rgba(255,255,255,.7);outline-offset:-5px}
-.xf{display:grid;gap:4px}
-.xf .xl{display:flex;justify-content:space-between;font:700 11px Manrope;letter-spacing:2px;color:var(--mute)}
-#xf{-webkit-appearance:none;appearance:none;width:100%;height:54px;background:transparent}
-#xf::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,#14b8a6,#2a3140 45%,#2a3140 55%,#a855f7)}
-#xf::-moz-range-track{height:8px;border-radius:4px;background:linear-gradient(90deg,#14b8a6,#2a3140 45%,#2a3140 55%,#a855f7)}
-#xf::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:50px;margin-top:-21px;border-radius:7px;background:linear-gradient(90deg,#d9dee6,#fff 45%,#111 47%,#111 53%,#fff 55%,#c9ced8);box-shadow:0 3px 10px rgba(0,0,0,.6)}
-#xf::-moz-range-thumb{width:32px;height:50px;border:0;border-radius:7px;background:#fff}
-.xf .xb{display:flex;gap:8px;justify-content:center}
-.xf .xb .btn{min-height:38px;padding:0 12px}
 /* Dialoge */
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
 .ov.open{display:flex}
@@ -256,49 +224,132 @@ details .in{padding:2px 16px 14px}
 @media(max-width:860px){.top{flex-wrap:wrap}.tabs{order:3;flex:1 1 100%;max-width:none}.wrap{grid-template-columns:230px minmax(0,1fr)}.grid{--cols:3!important}.grid.plg{--cols:4!important}}
 @media(max-width:640px){body{overflow:auto}.wrap{grid-template-columns:1fr}.side{overflow:visible}.grid{--cols:2!important}.grid.plg{--cols:3!important}.mixer{grid-template-columns:1fr 1fr}.xf{grid-column:1/-1;order:-1}.irow{grid-template-columns:32px minmax(0,1fr) 44px}.irow select{grid-column:2/3}}
 @media(prefers-reduced-motion:reduce){.pad{transition:none}.pad.play,.deck.live{animation:none;box-shadow:0 0 0 4px #fff,0 0 30px var(--c)}.tab.live i{animation:none;transform:scale(1.6)}}
+/* ===== Layout v2: Kategorien links, Transport unten, Menü ☰ ===== */
+body{overflow:hidden}
+.top{margin:10px 12px 0;padding:8px 10px 8px 14px;gap:14px;justify-content:space-between}
+.brand .bt{font-size:24px}
+.tkh{flex:0 1 460px;min-width:0;display:flex;align-items:center;gap:10px;justify-content:center}
+.tkh[hidden]{display:none}
+.tkh .stat{flex:none}
+#tk{min-width:0;flex:1}
+.tkh .tkmsg{padding:6px 10px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tkh .tg{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);padding:4px 10px;margin:0;gap:10px;background:rgba(0,0,0,.28)}
+.tkh .tg .lg,.tkh .tkmore{display:none}
+.tkh .tm2{display:flex;align-items:center;gap:8px;text-align:left;font-size:12.5px}
+.tkh .tm2:last-child{flex-direction:row-reverse;text-align:right}
+.tkh .tm2 img,.tkh .tm2 i{width:26px;height:26px;flex:none}
+.tkh .tm2 span{-webkit-line-clamp:1;white-space:nowrap;text-overflow:ellipsis;display:block}
+.tkh .sc{min-width:56px}.tkh .sc b{font-size:26px}.tkh .tg:not(.live):not(.end) .sc b{font-size:20px}.tkh .sc small{margin-top:1px;font-size:9.5px}
+.tkh .tg~.tg{display:none}
+.menuw{position:relative;flex:none}
+.menub{width:44px;height:44px;border-radius:10px;display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.menub i{display:block;width:3px;height:18px;border-radius:2px;background:#c6cdd8}
+.menub[aria-expanded=true]{background:#fff}.menub[aria-expanded=true] i{background:#000}
+.menu{position:absolute;right:0;top:52px;z-index:30;min-width:200px;padding:6px;border-radius:14px;background:#151b26;border:1px solid var(--line);box-shadow:0 18px 40px rgba(0,0,0,.55);display:grid;gap:2px}
+.menu[hidden]{display:none}
+.menu button{min-height:46px;padding:0 14px;border-radius:9px;text-align:left;font:700 14.5px Manrope;color:#e6ebf2}
+.menu button:hover,.menu button:active{background:rgba(255,255,255,.07)}
+.menu button.on{background:#fff;color:#000}
+.wrap{grid-template-columns:210px minmax(0,1fr);gap:12px;padding:12px 12px 0}
+.wrap.slim{grid-template-columns:64px minmax(0,1fr)}
+.side{background:rgba(17,22,32,.82);border:1px solid var(--line);border-radius:16px;padding:8px;gap:8px;overflow:hidden}
+.side .tabs{flex:1;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:3px;overflow-y:auto;overflow-x:hidden;padding:0;margin:0;background:none;border:0;max-width:none;scrollbar-width:none}
+.side .tab{min-height:48px;padding:0 10px 0 12px;border-radius:10px;font:700 14px Manrope;color:#c6cdd8;justify-content:flex-start;gap:10px;flex:none;position:relative}
+.side .tab i{width:10px;height:10px;border-radius:3px;flex:none}
+.side .tab b{margin-left:auto;font:700 12px Manrope;color:var(--mute);background:rgba(255,255,255,.06);padding:2px 7px;border-radius:99px}
+.side .tab.sel{background:var(--c);color:#04110c;box-shadow:0 6px 18px -8px var(--c)}
+.side .tab.sel b{background:rgba(0,0,0,.18);color:rgba(0,0,0,.7)}
+.side .tab.sel i{background:rgba(0,0,0,.35)}
+.side .tab.addc{border:1.5px dashed var(--line);color:var(--mute);justify-content:center}
+.side .tab.dropmark{transform:none;background:#fff;color:#000}
+.sidetg{width:100%;height:36px;flex:none;border-radius:9px;background:rgba(255,255,255,.04)}
+.wrap.slim .sidetg svg{transform:rotate(180deg)}
+.wrap.slim .side .tab{padding:0;justify-content:center;font-size:0;gap:0}
+.wrap.slim .side .tab i{width:16px;height:16px;border-radius:5px}
+.wrap.slim .side .tab b{display:none}
+.wrap.slim .side .tab.addc{font-size:18px}
+main{padding-bottom:12px}
+.editbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);flex:none}
+.editbar div{flex:1 1 260px}.editbar b{display:block;font:800 15px Manrope}.editbar span{font-size:13px;color:var(--mute)}
+/* feste Leiste unten */
+.tbar{display:flex;align-items:center;gap:10px;margin:12px;margin-bottom:calc(12px + env(safe-area-inset-bottom));padding:10px;border-radius:18px;background:rgba(17,22,32,.92);border:1px solid var(--line);box-shadow:0 -10px 30px -12px rgba(0,0,0,.6)}
+.bb{flex:none;min-height:62px;min-width:110px;padding:0 18px;border-radius:13px;font:400 24px/1 "Bebas Neue",Impact,sans-serif;letter-spacing:1.5px;border:1px solid var(--line)}
+.bb.stop{background:#ef4444;color:#fff;border-color:transparent;box-shadow:0 6px 18px -8px #ef4444}
+.bb.stop:active{filter:brightness(1.2)}
+.bb.fade{background:rgba(245,180,11,.16);color:#ffd77a;border-color:rgba(245,180,11,.4)}
+.bb.mic{background:rgba(255,255,255,.07);color:#fff;min-width:130px}
+.bb.mic.on{background:#fff;color:#000;animation:micp 1s ease-in-out infinite}
+.bb:active{transform:scale(.97)}
+.tbar #now{flex:1;min-width:0;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;align-items:stretch}
+.tbar #now::-webkit-scrollbar{display:none}
+.tbar #now .idle{display:flex;align-items:center;padding:0 14px;border-radius:12px;background:rgba(0,0,0,.25);color:var(--mute);font:700 13px Manrope;letter-spacing:1px;text-transform:uppercase;min-height:62px;flex:1}
+.tbar .chip{flex:none;min-width:190px;max-width:260px;min-height:62px;align-content:center}
+.tbar .master{flex:none;width:200px;margin:0;padding:0 8px}
+@media(max-width:1000px){.tbar .master{width:150px}.bb{min-width:92px;padding:0 12px}.tkh{flex-basis:340px}}
+@media(max-width:860px){.top{flex-wrap:nowrap}.tkh .tm2 span{display:none}.wrap{grid-template-columns:170px minmax(0,1fr)}.tbar{flex-wrap:wrap}.tbar #now{order:5;flex:1 1 100%}.tbar .master{flex:1;width:auto}}
+@media(max-width:640px){body{overflow:auto}.wrap{grid-template-columns:1fr}.side{max-height:none}.side .tabs{flex-direction:row;overflow-x:auto}.side .tab{flex:none}.sidetg{display:none}.tkh{display:none}}
+/* ===== Handy (schmal): kompakt, Reiter als Wischleiste, Bedienleiste eine Zeile ===== */
+@media(max-width:640px){
+body{overflow:hidden}
+.top{margin:6px 8px 0;padding:6px 6px 6px 12px;border-radius:14px}
+.brand .bt{font-size:19px}.brand .ico{width:18px;height:18px}.brand img{height:30px}
+.menub{width:38px;height:38px}.menub i{height:15px}
+.menu{top:44px}
+.wrap,.wrap.slim{display:flex;flex-direction:column;gap:8px;padding:8px 8px 0;flex:1;min-height:0}
+.side{flex:none;background:none;border:0;padding:0;border-radius:0;overflow:visible}
+.side .tabs{flex-direction:row;gap:6px;overflow-x:auto;overflow-y:hidden;padding:2px 0}
+.side .tab,.wrap.slim .side .tab{flex:none;min-height:36px;padding:0 13px;border-radius:99px;font-size:13px;background:rgba(255,255,255,.06);gap:7px;justify-content:center}
+.side .tab i,.wrap.slim .side .tab i{width:8px;height:8px;border-radius:50%}
+.side .tab b{display:none}
+.side .tab.sel{background:var(--c);color:#04110c}
+main{flex:1;min-height:0;overflow-y:auto;gap:8px;padding-bottom:8px}
+.sec{border-radius:12px}
+.sec h2{padding:7px 12px;font-size:10px;letter-spacing:2px}.sec h2 small{font-size:10px}
+.grid,.grid.plg{--cols:2!important;gap:8px;padding:8px}
+.grid.plg{--cols:3!important}
+.pad{aspect-ratio:1.75;padding:8px 10px;border-radius:9px}
+.pad .nm{font-size:14px;-webkit-line-clamp:2}
+.pad .meta{font-size:10px}.pad.play .tm{font-size:15px}
+.pad.pl{aspect-ratio:1}.pad.pl .nr{font-size:40px}
+.editbar,.miss{padding:10px 12px}
+.tbar{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:6px 8px calc(6px + env(safe-area-inset-bottom));padding:6px;border-radius:14px}
+.tbar #now{grid-column:1/-1;order:-1;flex:none;display:flex;gap:6px}
+.tbar #now:has(.idle){display:none}
+.tbar .chip{flex:1 0 70%;min-width:0;max-width:none;min-height:0;padding:6px 10px;gap:4px;border-left-width:3px}
+.tbar .chip b{font-size:13px}.tbar .chip span{font-size:10.5px}.tbar .chip strong{font-size:12.5px}
+.bb,.bb.mic{min-height:46px;min-width:0;padding:0 4px;font-size:18px;border-radius:11px;letter-spacing:1px}
+.tbar .master{display:none}
+}
 </style>
 </head>
 <body>
 <header class="top">
-  <button class="sidetg" id="bSide" aria-label="Seitenleiste ein- oder ausklappen"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
   <div class="brand"><img id="logo" alt="Vereinslogo" hidden><span class="ico"><i style="background:#14b8a6"></i><i style="background:#22c55e"></i><i style="background:#eab308"></i><i style="background:#0ea5e9"></i><i style="background:#a855f7"></i><i style="background:#f97316"></i><i style="background:#ec4899"></i><i style="background:#6366f1"></i><i style="background:#ef4444"></i></span><span class="bt">Hallen-DJ</span></div>
-  <nav class="tabs" id="tabs"></nav>
-  <div class="tools">
-    <button class="btn" id="bMix">Mixer</button>
-    <button class="btn" id="bImp2">Import</button>
-    <button class="btn" id="bEdit">Bearbeiten</button>
-    <button class="btn" id="bSet">Einstellungen</button>
+  <div class="tkh" id="tkP"><span class="stat" id="tkSt">LÄDT</span><div id="tk"></div></div>
+  <div class="menuw">
+    <button class="menub" id="bMenu" aria-label="Menü" aria-expanded="false"><i></i><i></i><i></i></button>
+    <div class="menu" id="menu" hidden>
+      <button id="bEdit">Bearbeiten</button>
+      <button id="bImp2">Import</button>
+      <button id="bSync">Musik-Ordner abgleichen</button>
+      <button id="bSet">Einstellungen</button>
+    </div>
   </div>
 </header>
 <div class="wrap">
   <aside class="side">
-    <div class="rail">
-      <button class="rb stopc" id="rStop">STOP</button>
-      <button class="rb fadec" id="rFade">AUS</button>
-      <button class="rb micb" id="rMic">MIC</button>
-      <div class="rlive" id="rLive"></div>
-    </div>
-    <section class="panel" id="tkP">
-      <div class="ph">WÜMMETICKER <span class="stat" id="tkSt">LÄDT</span></div>
-      <div id="tk"><div class="tkmsg">Spielstände werden geladen …</div></div>
-    </section>
-    <section class="panel">
-      <div class="ph">JETZT LÄUFT <span class="stat" id="stat">BEREIT</span></div>
-      <div id="now"></div>
-      <div class="row3"><button class="btn stop" id="bStop">Stop</button><button class="btn fade" id="bFade">Ausblenden</button></div>
-    </section>
-    <section class="panel">
-      <button class="btn mic" id="bMic">Sprecher</button>
-      <div class="master"><label for="mv">MASTER</label><input id="mv" type="range" min="0" max="100" value="90"><output id="mvo">90</output></div>
-    </section>
+    <nav class="tabs" id="tabs"></nav>
+    <button class="sidetg" id="bSide" aria-label="Kategorien ein- oder ausklappen"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 6l-6 6 6 6"/></svg></button>
   </aside>
   <main id="main"></main>
 </div>
-<section class="mixer" id="mixer" hidden>
-  <button class="deck" id="dkA" data-dk="A"><span class="dl">DECK A <em></em></span><b class="dn">leer</b><span class="dt">Pad antippen lädt hierher</span><span class="lvl"><i></i></span><i class="dbar"></i></button>
-  <div class="xf"><div class="xl"><span>A</span><span id="xfv">A 100 · B 0</span><span>B</span></div><input type="range" id="xf" min="0" max="1000" value="0" aria-label="Crossfader"><div class="xb"><button class="btn" id="xfA">« A</button><button class="btn" id="xfAuto">Auto-Übergang</button><button class="btn" id="xfB">B »</button></div></div>
-  <button class="deck" id="dkB" data-dk="B"><span class="dl">DECK B <em></em></span><b class="dn">leer</b><span class="dt">&nbsp;</span><span class="lvl"><i></i></span><i class="dbar"></i></button>
-</section>
+<footer class="tbar">
+  <button class="bb stop" id="bStop">Stop</button>
+  <button class="bb fade" id="bFade">Ausblenden</button>
+  <button class="bb mic" id="bMic">Sprecher</button>
+  <div id="now"></div>
+  <div class="master"><label for="mv">MASTER</label><input id="mv" type="range" min="0" max="100" value="90"><output id="mvo">90</output></div>
+</footer>
 
 <div class="ov" id="ovPad"><div class="dlg" id="dPad"></div></div>
 <div class="ov" id="ovCat"><div class="dlg" id="dCat"></div></div>
@@ -310,6 +361,8 @@ details .in{padding:2px 16px 14px}
 <input type="file" id="multiIn" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple hidden>
 <input type="file" id="rlDirIn" webkitdirectory directory multiple hidden>
 <input type="file" id="rlIn" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple hidden>
+<input type="file" id="syDirIn" webkitdirectory directory multiple hidden>
+<input type="file" id="syIn" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac" multiple hidden>
 <input type="file" id="logoIn" accept="image/*" hidden>
 <input type="file" id="bakIn" accept=".zip,.json,application/zip,application/json" hidden>
 <div class="toast" id="toast"></div>
@@ -354,13 +407,21 @@ const save=()=>put('state',S).catch(()=>{});
    Kurze Clips (≤ 90 s) liegen dekodiert im Speicher = null Verzögerung.
    Lange Songs laufen gestreamt über ein Audio-Element = kaum Speicherbedarf, kein Absturz bei vielen Songs. */
 const AC=window.AudioContext||window.webkitAudioContext;
-const ctx=new AC({latencyHint:'interactive'});
+/* iPhone/iPad: Wiedergabe-Modus VOR dem Audio-Kontext setzen – sonst schaltet der Stumm-Schalter den Ton ab */
 try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
+const ctx=new AC({latencyHint:'interactive'});
 const master=ctx.createGain(),duckG=ctx.createGain(),lim=ctx.createDynamicsCompressor();
 try{lim.threshold.value=-1.5;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=.002;lim.release.value=.15}catch(e){}
 master.connect(duckG);duckG.connect(lim);lim.connect(ctx.destination);
 const SND=new Map(),AN=new Map(),playing=new Map(),loading=new Map();
-const SHORT=90,BUDGET=300*1048576;let bufBytes=0;
+/* Alles läuft als Web Audio (iOS blockiert den Audio-Player in der App). Speicher-Limit mit LRU: selten genutzte lange Songs werden entladen und beim Antippen neu dekodiert. */
+/* Eigene Seite (GitHub / Home-Bildschirm): lange Songs werden gestreamt = kaum Arbeitsspeicher.
+   In der Claude-Vorschau (eingebettet) blockiert iOS das Streamen → dort wird alles dekodiert. */
+const EMBED=(()=>{try{return window.top!==window}catch(e){return true}})();
+const SHORT=90,BUDGET=(Math.min(screen.width,screen.height)<600?220:380)*1048576;let bufBytes=0;
+function evict(keep){while(bufBytes>BUDGET){let v=null;const busy=new Set([...playing.values()].map(o=>o.s));
+  for(const [sid,s] of SND)if(s.kind==='buf'&&sid!==keep&&!sid.startsWith('gen:')&&!busy.has(s)&&(!v||(s.last||0)<(v[1].last||0)))v=[sid,s];
+  if(!v)break;SND.delete(v[0]);bufBytes-=bytes(v[1].buf);for(const p of S.pads)if(p.soundId===v[0]){const e=padEls.get(p.id);if(e)e.el.classList.add('ld')}}}
 const DK={A:ctx.createGain(),B:ctx.createGain()};DK.A.connect(master);DK.B.connect(master);
 const MX={x:0,target:null,deck:{A:null,B:null},anim:0};
 function setX(v,fromSlider){MX.x=Math.min(1,Math.max(0,v));const a=Math.cos(MX.x*Math.PI/2),b=Math.sin(MX.x*Math.PI/2);
@@ -401,18 +462,33 @@ function ensure(sid){
     if(sid.startsWith('gen:')){const b=gen(sid.slice(4));if(!AN.has(sid))AN.set(sid,analyze(b));s={kind:'buf',buf:b,dur:b.duration}}
     else{const rec=await get('snd:'+sid);if(!rec)return null;
       let an=AN.get(sid);if(!an){try{an=await get('an:'+sid)}catch(e){}}
-      let b=null;
-      if(!an||an.dur<=SHORT){b=await decode(rec.blob);if(!an){an=analyze(b);put('an:'+sid,an).catch(()=>{})}}
-      AN.set(sid,an);
-      if(b&&an.dur<=SHORT&&bufBytes+bytes(b)<BUDGET){bufBytes+=bytes(b);s={kind:'buf',buf:b,dur:an.dur}}
-      else{b=null;s=mkMedia(rec.blob,an.dur)}}
-    SND.set(sid,s);markReady(sid);return s})().finally(()=>loading.delete(sid));
+      if(!EMBED&&an&&an.dur>SHORT){AN.set(sid,an);s=mkMedia(rec.blob,an.dur)}
+      else{let b=await decode(rec.blob);if(!an){an=analyze(b);put('an:'+sid,an).catch(()=>{})}AN.set(sid,an);
+        if(!EMBED&&an.dur>SHORT){b=null;s=mkMedia(rec.blob,an.dur)}
+        else{bufBytes+=bytes(b);s={kind:'buf',buf:b,dur:b.duration}}}}
+    s.last=performance.now();SND.set(sid,s);evict(sid);markReady(sid);return s})().finally(()=>loading.delete(sid));
   loading.set(sid,pr);return pr}
 function drop(sid){loading.delete(sid);const s=SND.get(sid);if(s){if(s.kind==='buf')bufBytes-=bytes(s.buf);else{try{s.el.pause();URL.revokeObjectURL(s.url);s.el.removeAttribute('src');s.el.load()}catch(e){}}}
   SND.delete(sid);AN.delete(sid);del('an:'+sid).catch(()=>{})}
-function unlockMedia(){for(const s of SND.values())if(s.kind==='media'&&!s.ok&&!s.live&&!s.trying){s.trying=true;const el=s.el;el.muted=true;
+function unlockMedia(){/* nie, während ein gestreamter Song läuft – auf dem iPhone könnte das stumme Freischalten ihn stören */for(const o of playing.values())if(o.s.kind==='media')return;
+  for(const s of SND.values())if(s.kind==='media'&&!s.ok&&!s.live&&!s.trying){s.trying=true;const el=s.el;el.muted=true;
   let pr;try{pr=el.play()}catch(e){}if(pr&&pr.then)pr.then(()=>{s.ok=true;s.trying=false;if(!s.live){el.pause();try{el.currentTime=0}catch(e){}}el.muted=false}).catch(()=>{s.trying=false;el.muted=false});else{s.trying=false;el.muted=false}}}
-const unlock=()=>{if(ctx.state!=='running')ctx.resume().catch(()=>{});unlockMedia();keepAwake()};
+/* iOS-Ton-Freischaltung:
+   1) ctx.resume() bei jeder Berührung (iOS akzeptiert das teils erst beim Loslassen → auch touchend/click)
+   2) einmalig ein unhörbarer Mini-Sound über Web Audio
+   3) ein stilles HTML-Audio im Dauerlauf: schaltet iOS in den Wiedergabe-Modus, dann ist der Ton auch bei Stumm-Schalter hörbar */
+let primed=false,silentEl=null;
+/* iPhone-Stumm-Schalter: ein stilles HTML-Audio (20 s, Endlosschleife) hält iOS im Wiedergabe-Modus, dann ist Web Audio auch bei „Stumm“ hörbar.
+   Unbedenklich, weil alle Sounds über Web Audio laufen und kein zweiter Audio-Player im Spiel ist. */
+function silentWav(){const sr=8000,n=sr*20,b=new ArrayBuffer(44+n*2),v=new DataView(b);const w=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i))};
+  w(0,'RIFF');v.setUint32(4,36+n*2,true);w(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,n*2,true);
+  return URL.createObjectURL(new Blob([b],{type:'audio/wav'}))}
+function prime(){
+  if(!primed){primed=true;try{const b=ctx.createBuffer(1,1,22050),s=ctx.createBufferSource();s.buffer=b;s.connect(ctx.destination);s.start(0)}catch(e){}}
+  if(!EMBED)return; /* auf eigener Seite übernimmt navigator.audioSession den Stumm-Schalter; kein stilles Audio, das Streams stören könnte */
+  try{if(!silentEl){silentEl=document.createElement('audio');silentEl.setAttribute('playsinline','');silentEl.loop=true;silentEl.preload='auto';silentEl.src=silentWav()}
+    if(silentEl.paused){const pr=silentEl.play();if(pr&&pr.catch)pr.catch(()=>{})}}catch(e){}}
+const unlock=()=>{prime();if(ctx.state!=='running')ctx.resume().catch(()=>{});unlockMedia();keepAwake()};
 let wl=null;async function keepAwake(){try{if(!wl&&navigator.wakeLock){wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>wl=null)}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){keepAwake();if(ctx.state!=='running')ctx.resume().catch(()=>{})}});
 ctx.onstatechange=()=>{if(ctx.state!=='running'&&playing.size){toast('Audio wurde vom iPad unterbrochen – Pad antippen zum Fortsetzen');LOG.push({t:new Date(),n:'iPad',ev:'Audio unterbrochen ('+ctx.state+')'})}};
@@ -437,7 +513,7 @@ function start(p,s,preview){try{
   const now=ctx.currentTime,v=vol(p.vol)*Math.pow(10,normDb(p.soundId)/20);
   if(p.fadeIn>0){g.gain.setValueAtTime(0.0001,now);g.gain.linearRampToValueAtTime(v,now+p.fadeIn)}else g.gain.setValueAtTime(v,now);
   if(!p.loop&&p.fadeOut>0&&len>p.fadeOut*2){g.gain.setValueAtTime(v,now+len-p.fadeOut);g.gain.linearRampToValueAtTime(0.0001,now+len)}
-  const o={s,g,t0:now,st,en,len,loop:p.loop,fading:false,dk,key,ms:performance.now(),started:s.kind==='buf'};lg(key,'Start'+(dk?' auf Deck '+dk:'')+(s.kind==='media'?' (gestreamt)':''));
+  s.last=performance.now();const o={s,g,t0:now,st,en,len,loop:p.loop,fading:false,dk,key,ms:performance.now(),started:s.kind==='buf'};lg(key,'Start'+(dk?' auf Deck '+dk:'')+(s.kind==='media'?' (gestreamt)':''));
   if(s.kind==='buf'){const src=ctx.createBufferSource();src.buffer=s.buf;src.connect(g);o.src=src;
     if(p.loop){src.loop=true;src.loopStart=st;src.loopEnd=en;src.start(now,st)}else src.start(now,st,len);
     src.onended=()=>{if(playing.get(key)===o&&!o.fading)lg(key,'Ende: Song zu Ende');end(o)}}
@@ -448,7 +524,8 @@ function start(p,s,preview){try{
     el.addEventListener('playing',()=>{o.started=true},{once:true});
     el.onended=()=>{if(o.loop&&!o.fading&&playing.get(key)===o){try{el.currentTime=o.st}catch(e){}el.play().catch(()=>{});return}lg(key,'Ende: Song zu Ende');end(o)};
     const pr=el.play();if(pr&&pr.catch)pr.catch(()=>{if(playing.get(key)===o){toast('iPad hat den Start blockiert – Pad nochmal antippen');lg(key,'Fehler: Start vom iPad blockiert');end(o)}})}
-  playing.set(key,o);renderNow();paint()
+  playing.set(key,o);renderNow();paint();
+  setTimeout(()=>{if(ctx.state!=='running'&&playing.get(key)===o){lg(key,'Ton blockiert – Audio-Status: '+ctx.state);ctx.resume().catch(()=>{});toast('Kein Ton? Stumm-Schalter am Gerät prüfen und Lautstärke hochdrehen – dann Pad nochmal antippen')}},450)
 }catch(e){console.error(e);toast('Fehler beim Abspielen von „'+p.name+'“')}}
 function cleanup(o){clearTimeout(o.tm);
   if(o.s.kind==='media'){const el=o.s.el;el.onended=null;try{el.pause()}catch(e){}o.s.live=false;if(o.s.node)try{o.s.node.disconnect()}catch(e){}}
@@ -472,7 +549,7 @@ const stopAll=()=>{for(const id of [...playing.keys()]){lg(id,'Stopp: STOP gedr�
 let ducked=false;
 function duck(on){if(on===ducked)return;ducked=on;const t=ctx.currentTime,lv=Math.max(.02,(S.settings.duck??20)/100);
   duckG.gain.cancelScheduledValues(t);duckG.gain.setValueAtTime(duckG.gain.value,t);duckG.gain.linearRampToValueAtTime(on?lv:1,t+(on?.25:.9));
-  const b=document.getElementById('bMic');if(b){b.classList.toggle('on',on);b.textContent=on?'Sprecher AN':'Sprecher'}const rm=document.getElementById('rMic');if(rm)rm.classList.toggle('on',on)}
+  const b=document.getElementById('bMic');if(b){b.classList.toggle('on',on);b.textContent=on?'Sprecher AN':'Sprecher'}}
 
 /* Protokoll: warum ein Sound gestartet/beendet wurde – für die Fehlersuche (Einstellungen → Diagnose) */
 const LOG=[];const nm=id=>{const p=S.pads.find(x=>x.id===id);return p?p.name:id==='pv'?'Vorhören':'?'};
@@ -518,7 +595,8 @@ function render(){
   if(!cats.length){m.innerHTML='<div class="empty-st">Keine Kategorie vorhanden – lege eine in den Einstellungen an.</div>';return}
   let n=0;
   const banner=MISSING.size?`<div class="miss"><div><b>${MISSING.size} ${MISSING.size===1?'Song fehlt':'Songs fehlen'}</b><span>Wähle deinen Musik-Ordner – die Songs werden per Dateiname wieder an ihren Platz gesetzt.</span></div><button class="btn pri" id="rlDir">Ordner wählen</button><button class="btn" id="rlFiles">Dateien wählen</button></div>`:'';
-  m.innerHTML=banner+cats.map(c=>{const ps=padsOf(c);
+  const eb=editMode?`<div class="editbar"><div><b>Bearbeiten</b><span>Pad antippen = ändern · am Griff ☰ ziehen = verschieben (auch auf die Kategorien links)</span></div><button class="btn pri" id="bEditDone">Fertig</button></div>`:'';
+  m.innerHTML=eb+banner+cats.map(c=>{const ps=padsOf(c);
     const show=t!=='all'||ps.length||editMode;if(!show)return'';
     return `<section class="sec" data-cat="${c.id}"><h2 style="--c:${c.color};--c2:${hue(c.color,c.players?-35:38)}"><span>${esc(c.name)}</span><small>${ps.length} ${c.players?'Spieler':ps.length===1?'Sound':'Sounds'}</small></h2><div class="grid ${c.players?'plg':''}" style="--cols:${c.players?Math.min(9,S.settings.cols+2):S.settings.cols}">${ps.map(p=>padHtml(p,t==='all'?99:n++)).join('')}${(editMode||!ps.length)?addHtml(c.id,c.players):''}</div></section>`}).join('')||'<div class="empty-st">Noch keine Sounds. Tippe auf „Import“ oder „Bearbeiten“.</div>';
   m.querySelectorAll('.pad[data-pad]').forEach(el=>padEls.set(el.dataset.pad,{el,fill:el.querySelector('.fill'),tm:el.querySelector('.tm')}));
@@ -536,10 +614,9 @@ function updDecks(){if(!S.settings.mixer)return;const nx=autoDeck();
 function renderNow(){
   renderTabs();updDecks();
   const items=[...playing.entries()].filter(([k])=>k!=='pv');
-  const rl=$('#rLive');if(rl){const sc=(TK.games||[]).find(g=>g.live);rl.innerHTML=items.map(([id])=>{const p=S.pads.find(x=>x.id===id);return p?`<i style="--c:${colorOf(p)}"></i>`:''}).join('')+(sc?`<b>${sc.sh}:${sc.sg}</b>`:'')}
-  const st=$('#stat');st.textContent=items.length?(items.length>1?items.length+' AKTIV':'LÄUFT'):'BEREIT';st.classList.toggle('live',!!items.length);
+  
   $('#now').innerHTML=(items.length?items.map(([id])=>{const p=S.pads.find(x=>x.id===id);if(!p)return'';
-    return `<button class="chip" style="--c:${colorOf(p)}" data-chip="${id}"><b>${isPl(p)&&p.nr?'#'+esc(p.nr)+' ':''}${esc(p.name)}</b><div class="bar"><i></i></div><span><em>antippen = ausblenden</em><strong class="rm"></strong></span></button>`}).join(''):'<span class="idle">Kein Sound aktiv – Pad antippen zum Starten.</span>')
+    return `<button class="chip" style="--c:${colorOf(p)}" data-chip="${id}"><b>${isPl(p)&&p.nr?'#'+esc(p.nr)+' ':''}${esc(p.name)}</b><div class="bar"><i></i></div><span><em>tippen = aus</em><strong class="rm"></strong></span></button>`}).join(''):'<span class="idle">Bereit</span>')
 }
 const painted=new Set();
 function paint(){
@@ -620,14 +697,13 @@ function openSet(){const s=S.settings;
    <label class="fld"><span>Antippen eines laufenden Pads</span><select id="sTap"><option value="fade" ${s.tap==='fade'?'selected':''}>Ausblenden (Fade-Out des Pads)</option><option value="stop" ${s.tap==='stop'?'selected':''}>Sofort stoppen</option><option value="restart" ${s.tap==='restart'?'selected':''}>Von vorne starten</option></select></label>
    ${slider('sFa','„Alle ausblenden“ Dauer',s.fadeAll,.5,8,.5,' s')}
    ${slider('sGuard','Schutz gegen Doppeltippen',s.guard??800,0,2000,100,' ms')}
-   ${slider('sXf','Auto-Übergang im Mixer',s.xfade??4,1,15,.5,' s')}
    <label class="chk"><input type="checkbox" id="sNorm" ${s.norm!==false?'checked':''}> Lautstärke aller Sounds automatisch angleichen</label>
    ${slider('sDuck','Sprecher-Taste senkt Musik auf',s.duck??20,5,60,5,' %')}
    <label class="fld"><span>Sprecher-Taste</span><select id="sDm"><option value="hold" ${s.duckMode!=='toggle'?'selected':''}>Gedrückt halten</option><option value="toggle" ${s.duckMode==='toggle'?'selected':''}>Antippen = an / aus</option></select></label>
    ${slider('sCols','Pads pro Reihe (iPad quer)',s.cols,3,8,1,'')}
   </div></details>
   <details><summary>Diagnose</summary><div class="in"><p class="hint">Hier steht, warum ein Sound gestartet oder beendet wurde – die letzten 80 Ereignisse, neueste oben. Bricht ein Sound unerwartet ab, hier nachschauen oder mir den Text schicken.</p>
-   <div class="diag">${LOG.length?LOG.slice().reverse().map(x=>`<div><b>${x.t.toLocaleTimeString('de-DE')}</b> ${esc(x.n)} – ${esc(x.ev)}</div>`).join(''):'<div>Noch keine Ereignisse.</div>'}</div>
+   <div class="diag"><div><b>Audio</b> ${ctx.state} · Modus: ${EMBED?'Vorschau – alles geladen':'eigene Seite – lange Songs gestreamt'} · Wiedergabe-Modus: ${navigator.audioSession?navigator.audioSession.type:'nicht verfügbar'} · Stumm-Schutz: ${silentEl&&!silentEl.paused?'aktiv':'aus'} · Speicher: ${Math.round(bufBytes/1048576)} von ${Math.round(BUDGET/1048576)} MB</div>${LOG.length?LOG.slice().reverse().map(x=>`<div><b>${x.t.toLocaleTimeString('de-DE')}</b> ${esc(x.n)} – ${esc(x.ev)}</div>`).join(''):'<div>Noch keine Ereignisse.</div>'}</div>
    <div class="acts"><button class="btn" id="bDiag">Als Text kopieren</button></div></div></details>
   <details><summary>WümmeTicker</summary><div class="in">
    <label class="chk"><input type="checkbox" id="sTk" ${s.tk!==false?'checked':''}> Spielstände links in der Seitenleiste zeigen</label>
@@ -691,6 +767,13 @@ async function exportLight(){const names=await songNames();let logo=null;
   const st={...S,libNames:undefined};
   const blob=new Blob([JSON.stringify({v:3,app:'hallen-dj',state:st,names,logo},null,1)],{type:'application/json'});
   await saveFile('hallen-dj-board-'+new Date().toISOString().slice(0,10)+'.json',blob,`Board gesichert (${Math.max(1,Math.round(blob.size/1024))} KB, ohne Songs)`)}
+/* Musik-Ordner abgleichen: fehlende Songs per Dateiname zurückholen, neue Songs zur Zuordnung auf die Import-Seite */
+async function syncFolder(files){const fl=files.map(x=>x.file||x).filter(isAudio);if(!fl.length){toast('Keine Audiodateien gefunden');return}
+  await checkMissing();let fixed=0;
+  if(MISSING.size){const before=MISSING.size;await relink(fl);fixed=before-MISSING.size}
+  const known=await knownSounds();const fresh=files.filter(x=>{const f=x.file||x;return isAudio(f)&&!known.has(f.name+'|'+f.size)});
+  if(fresh.length){openImp();await stageFiles(fresh);toast(`${fresh.length} neue Songs – bitte Kategorien zuordnen`+(fixed?` · ${fixed} fehlende zurückgeholt`:''))}
+  else toast(fixed?`${fixed} fehlende Songs zurückgeholt · keine neuen Songs`:'Alles aktuell – keine neuen Songs im Ordner')}
 /* Fehlende Songs nach dem Wiederherstellen */
 let MISSING=new Set();
 async function checkMissing(){const keys=new Set((await allKeys()).map(String));MISSING=new Set(S.pads.map(p=>p.soundId).filter(s=>s&&!s.startsWith('gen:')&&!keys.has('snd:'+s)));return MISSING}
@@ -729,18 +812,23 @@ async function importBak(f){
     toast(MISSING.size?`Board geladen – ${MISSING.size} Songs bitte oben zuordnen`:`Sicherung geladen · ${n} Sounds`);preloadAll()}
   catch(e){console.warn(e);toast('Sicherung konnte nicht geladen werden: '+(e&&e.message||'ungültige Datei'))}
 }
-async function preloadAll(){for(const sid of [...new Set(S.pads.map(p=>p.soundId).filter(Boolean))]){try{await ensure(sid)}catch(e){console.warn('Sound nicht lesbar',sid,e)}}}
+async function preloadAll(){/* kurze Clips zuerst, lange Songs nur solange Platz ist – der Rest wird beim ersten Antippen geladen */
+  const sids=[...new Set(S.pads.map(p=>p.soundId).filter(Boolean))],du={};
+  for(const sid of sids){let a=AN.get(sid);if(!a&&!sid.startsWith('gen:')){try{a=await get('an:'+sid)}catch(e){}}du[sid]=a?a.dur:60}
+  sids.sort((a,b)=>du[a]-du[b]);
+  for(const sid of sids){if(EMBED&&du[sid]>SHORT&&bufBytes+du[sid]*ctx.sampleRate*8>BUDGET*.85)continue;try{await ensure(sid)}catch(e){console.warn('Sound nicht lesbar',sid,e)}}}
 async function resetAll(){stopAll();duck(false);
   for(const sid of [...SND.keys()])drop(sid);
   try{if(db)await tx('readwrite',s=>s.clear());else mem.clear()}catch(e){}
   showLogo(null);S=defaults();await save();editMode=false;$('#ovSet').classList.remove('open');render();renderNow();showMixer();preloadAll();toast('Board zurückgesetzt')}
 
 /* ---------- Ereignisse ---------- */
-document.addEventListener('pointerdown',unlock,{passive:true});
+['pointerdown','touchend','click','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{passive:true,capture:true}));
 $('#mv').addEventListener('input',e=>{const v=+e.target.value;S.settings.master=v;$('#mvo').textContent=v;master.gain.setTargetAtTime(vol(v),ctx.currentTime,.03)});
 $('#mv').addEventListener('change',save);
 $('#bFade').onclick=fadeAll;$('#bStop').onclick=stopAll;
 $('#bEdit').onclick=()=>{editMode=!editMode;render()};
+$('#main').addEventListener('click',e=>{if(e.target.id==='bEditDone'){editMode=false;render()}});
 $('#bSet').onclick=openSet;
 $('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-newcat]')){openCat(null,id=>{S.settings.tab=id;render()});return}
   const b=e.target.closest('[data-tab]');if(!b)return;const id=b.dataset.tab;
@@ -906,23 +994,18 @@ async function doImport(){
   imBusy=false;await save();render();renderImp();
   toast(`${todo.length-bad} Sounds importiert`+(bad?` · ${bad} nicht lesbar`:''));if(!IM.length)$('#ovImp').classList.remove('open')}
 $('#bImp2').onclick=openImp;
+$('#bSync').onclick=()=>{const d=$('#syDirIn');('webkitdirectory' in d?d:$('#syIn')).click()};
+['syDirIn','syIn'].forEach(id=>$('#'+id).addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)syncFolder(fs)}));
 function applySide(){$('.wrap').classList.toggle('slim',!!S.settings.slim)}
 $('#bSide').onclick=()=>{S.settings.slim=!S.settings.slim;save();applySide()};
-$('#rStop').onclick=()=>stopAll();$('#rFade').onclick=()=>fadeAll();
-$('#rMic').addEventListener('pointerdown',e=>{e.preventDefault();unlock();try{e.target.setPointerCapture(e.pointerId)}catch(x){}if(S.settings.duckMode==='toggle')duck(!ducked);else duck(true)});
-['pointerup','pointercancel','lostpointercapture'].forEach(n=>$('#rMic').addEventListener(n,()=>{if(S.settings.duckMode!=='toggle')duck(false)}));
+/* Menü ☰ */
+const menu=$('#menu');function closeMenu(){menu.hidden=true;$('#bMenu').setAttribute('aria-expanded','false')}
+$('#bMenu').onclick=e=>{e.stopPropagation();menu.hidden=!menu.hidden;$('#bMenu').setAttribute('aria-expanded',String(!menu.hidden))};
+menu.addEventListener('click',()=>setTimeout(closeMenu,0));document.addEventListener('pointerdown',e=>{if(!e.target.closest('.menuw'))closeMenu()});
 $('#bMic').addEventListener('pointerdown',e=>{e.preventDefault();unlock();try{e.target.setPointerCapture(e.pointerId)}catch(x){}if(S.settings.duckMode==='toggle')duck(!ducked);else duck(true)});
 ['pointerup','pointercancel','lostpointercapture'].forEach(n=>$('#bMic').addEventListener(n,()=>{if(S.settings.duckMode!=='toggle')duck(false)}));
 $('#bMic').addEventListener('contextmenu',e=>e.preventDefault());
-function showMixer(){const on=!!S.settings.mixer;$('#mixer').hidden=!on;$('#bMix').classList.toggle('on',on);setX(MX.x);updDecks()}
-$('#bMix').onclick=()=>{S.settings.mixer=!S.settings.mixer;save();showMixer();toast(S.settings.mixer?'Mixer an: Pads laden abwechselnd auf Deck A / B':'Mixer aus')};
-$('#xf').addEventListener('input',e=>{cancelAnimationFrame(MX.anim);setX(e.target.value/1000,true)});
-function glide(to,sec){cancelAnimationFrame(MX.anim);const from=MX.x,t0=performance.now(),d=Math.max(.05,sec)*1000;
-  const st=n=>{const k=Math.min(1,(n-t0)/d),e=k<.5?2*k*k:1-((-2*k+2)**2)/2;setX(from+(to-from)*e);if(k<1)MX.anim=requestAnimationFrame(st)};MX.anim=requestAnimationFrame(st)}
-$('#xfA').onclick=()=>glide(0,.6);$('#xfB').onclick=()=>glide(1,.6);
-$('#xfAuto').onclick=()=>{unlock();glide(MX.x<.5?1:0,S.settings.xfade??4)};
-$('#mixer').addEventListener('click',e=>{const d=e.target.closest('[data-dk]');if(!d)return;const k=d.dataset.dk;
-  MX.target=MX.target===k?null:k;updDecks();if(MX.target)toast('Nächstes Pad lädt auf Deck '+k)});
+function showMixer(){S.settings.mixer=false} /* Mixer entfernt */
 $('#dirIn').addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';stageFiles(fs)});
 $('#multiIn').addEventListener('change',e=>{const fs=[...e.target.files];e.target.value='';stageFiles(fs)});
 $('#ovImp').addEventListener('click',e=>{if(e.target.id==='ovImp'){stopPv();$('#ovImp').classList.remove('open')}});
