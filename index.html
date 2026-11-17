@@ -271,6 +271,16 @@ body{overflow:hidden}
 main{padding-bottom:12px}
 .editbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);flex:none}
 .editbar div{flex:1 1 260px}.editbar b{display:block;font:800 15px Manrope}.editbar span{font-size:13px;color:var(--mute)}
+.tkh #tk{display:flex;align-items:center;gap:10px}
+.tkh #tk .tg{flex:1 1 auto;min-width:0}
+.tsc{flex:0 1 270px;min-width:0;display:grid;gap:1px;padding:5px 12px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid var(--line);border-left:3px solid #8b95a7}
+.tsc.us{border-left-color:#22c55e;background:rgba(34,197,94,.08)}
+.tsc .tl{font:800 9.5px Manrope;letter-spacing:1.5px;color:var(--mute)}
+.tsc b{font:800 13.5px Manrope;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsc small{font:600 10.5px Manrope;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tsc.flash{animation:goalf 1.6s ease-out 2}
+@keyframes goalf{0%{background:#22c55e;color:#04140a}100%{}}
+.tkh{flex-basis:640px}
 /* feste Leiste unten */
 .tbar{display:flex;align-items:center;gap:10px;margin:12px;margin-bottom:calc(12px + env(safe-area-inset-bottom));padding:10px;border-radius:18px;background:rgba(17,22,32,.92);border:1px solid var(--line);box-shadow:0 -10px 30px -12px rgba(0,0,0,.6)}
 .bb{flex:none;min-height:62px;min-width:110px;padding:0 18px;border-radius:13px;font:400 24px/1 "Bebas Neue",Impact,sans-serif;letter-spacing:1.5px;border:1px solid var(--line)}
@@ -470,7 +480,8 @@ function ensure(sid){
   loading.set(sid,pr);return pr}
 function drop(sid){loading.delete(sid);const s=SND.get(sid);if(s){if(s.kind==='buf')bufBytes-=bytes(s.buf);else{try{s.el.pause();URL.revokeObjectURL(s.url);s.el.removeAttribute('src');s.el.load()}catch(e){}}}
   SND.delete(sid);AN.delete(sid);del('an:'+sid).catch(()=>{})}
-function unlockMedia(){/* nie, während ein gestreamter Song läuft – auf dem iPhone könnte das stumme Freischalten ihn stören */for(const o of playing.values())if(o.s.kind==='media')return;
+const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function unlockMedia(){if(!IOS)return;/* nie, während ein gestreamter Song läuft – auf dem iPhone könnte das stumme Freischalten ihn stören */for(const o of playing.values())if(o.s.kind==='media')return;
   for(const s of SND.values())if(s.kind==='media'&&!s.ok&&!s.live&&!s.trying){s.trying=true;const el=s.el;el.muted=true;
   let pr;try{pr=el.play()}catch(e){}if(pr&&pr.then)pr.then(()=>{s.ok=true;s.trying=false;if(!s.live){el.pause();try{el.currentTime=0}catch(e){}}el.muted=false}).catch(()=>{s.trying=false;el.muted=false});else{s.trying=false;el.muted=false}}}
 /* iOS-Ton-Freischaltung:
@@ -516,19 +527,26 @@ function start(p,s,preview){try{
   s.last=performance.now();const o={s,g,t0:now,st,en,len,loop:p.loop,fading:false,dk,key,ms:performance.now(),started:s.kind==='buf'};lg(key,'Start'+(dk?' auf Deck '+dk:'')+(s.kind==='media'?' (gestreamt)':''));
   if(s.kind==='buf'){const src=ctx.createBufferSource();src.buffer=s.buf;src.connect(g);o.src=src;
     if(p.loop){src.loop=true;src.loopStart=st;src.loopEnd=en;src.start(now,st)}else src.start(now,st,len);
-    src.onended=()=>{if(playing.get(key)===o&&!o.fading)lg(key,'Ende: Song zu Ende');end(o)}}
+    src.onended=()=>{if(playing.get(key)!==o)return;
+      /* Wächter: endet ein Sound ohne Grund deutlich vor seinem Ende, wird er an der Stelle fortgesetzt */
+      const el=ctx.currentTime-o.t0;if(!o.done&&!o.fading&&!o.loop&&el<o.len-.3&&(o.retry=(o.retry||0)+1)<=3){lg(key,'Vorzeitig beendet bei '+el.toFixed(1)+' s – automatisch fortgesetzt');resumeBuf(o,el);return}
+      if(!o.fading)lg(key,'Ende: Song zu Ende');end(o)}}
   else{const el=s.el;s.live=true;el.muted=false;
     if(s.node){try{s.node.disconnect()}catch(e){}s.node.connect(g)}else el.volume=Math.min(1,v);
     try{el.currentTime=st}catch(e){}
     if(el.readyState<1)el.addEventListener('loadedmetadata',()=>{if(playing.get(key)===o){try{el.currentTime=st}catch(e){}}},{once:true});
     el.addEventListener('playing',()=>{o.started=true},{once:true});
-    el.onended=()=>{if(o.loop&&!o.fading&&playing.get(key)===o){try{el.currentTime=o.st}catch(e){}el.play().catch(()=>{});return}lg(key,'Ende: Song zu Ende');end(o)};
+    el.onpause=()=>{if(o.done||o.fading||playing.get(key)!==o||el.ended)return;if((o.retry=(o.retry||0)+1)>3)return;lg(key,'Vom Browser angehalten bei '+el.currentTime.toFixed(1)+' s – automatisch fortgesetzt');el.play().catch(()=>{})};
+    el.onended=()=>{if(o.loop&&!o.fading&&playing.get(key)===o){try{el.currentTime=o.st}catch(e){}el.play().catch(()=>{});return}
+      if(!o.done&&!o.fading&&playing.get(key)===o&&el.currentTime<o.en-1&&(o.retry=(o.retry||0)+1)<=3){lg(key,'Vorzeitig beendet bei '+el.currentTime.toFixed(1)+' s – automatisch fortgesetzt');el.play().catch(()=>{});return}lg(key,'Ende: Song zu Ende');end(o)};
     const pr=el.play();if(pr&&pr.catch)pr.catch(()=>{if(playing.get(key)===o){toast('iPad hat den Start blockiert – Pad nochmal antippen');lg(key,'Fehler: Start vom iPad blockiert');end(o)}})}
   playing.set(key,o);renderNow();paint();
   setTimeout(()=>{if(ctx.state!=='running'&&playing.get(key)===o){lg(key,'Ton blockiert – Audio-Status: '+ctx.state);ctx.resume().catch(()=>{});toast('Kein Ton? Stumm-Schalter am Gerät prüfen und Lautstärke hochdrehen – dann Pad nochmal antippen')}},450)
 }catch(e){console.error(e);toast('Fehler beim Abspielen von „'+p.name+'“')}}
-function cleanup(o){clearTimeout(o.tm);
-  if(o.s.kind==='media'){const el=o.s.el;el.onended=null;try{el.pause()}catch(e){}o.s.live=false;if(o.s.node)try{o.s.node.disconnect()}catch(e){}}
+function resumeBuf(o,off){try{const src=ctx.createBufferSource();src.buffer=o.s.buf;src.connect(o.g);const now=ctx.currentTime,rest=Math.max(.05,o.len-off);
+  src.start(now,o.st+off,rest);o.src=src;o.t0=now-off;src.onended=()=>{if(playing.get(o.key)!==o)return;if(!o.fading)lg(o.key,'Ende: Song zu Ende');end(o)}}catch(e){end(o)}}
+function cleanup(o){o.done=true;clearTimeout(o.tm);
+  if(o.s.kind==='media'){const el=o.s.el;el.onended=null;el.onpause=null;try{el.pause()}catch(e){}o.s.live=false;if(o.s.node)try{o.s.node.disconnect()}catch(e){}}
   else{try{o.src.onended=null;o.src.stop()}catch(e){}}
   setTimeout(()=>{try{o.g.disconnect()}catch(e){}},50)}
 function end(o){if(playing.get(o.key)!==o)return;playing.delete(o.key);cleanup(o);if(o.dk&&MX.deck[o.dk]===o.key)MX.deck[o.dk]=null;renderNow();paint()}
@@ -1080,7 +1098,7 @@ $('#main').addEventListener('click',e=>{if(DG.suppress||e.target.closest('[data-
 /* ---------- WümmeTicker ---------- */
 /* Liest die offene Schnittstelle von wuemmeticker.web.app. Fällt das Netz aus, bleibt der letzte Stand stehen – das Board selbst ist davon nie betroffen. */
 const TKB='https://wuemmeticker.web.app';
-const TK={club:null,clubAt:0,data:null,last:0,err:null,timer:0,prev:{},games:[]};
+const TK={ev:{},lastGoal:null,club:null,clubAt:0,data:null,last:0,err:null,timer:0,prev:{},games:[]};
 const pdate=s=>new Date(String(s).replace(/([+-]\d\d)(\d\d)$/,'$1:$2'));
 const hm=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 async function tkFetch(u){const ac=new AbortController(),t=setTimeout(()=>ac.abort(),7000);try{const r=await fetch(u,{signal:ac.signal,cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
@@ -1093,7 +1111,9 @@ async function tkLoad(){clearTimeout(TK.timer);
     TK.tl=sel?teams.filter(t=>t.group+'|'+t.label===sel):teams;
     const groups=[...new Set(TK.tl.map(t=>t.group))];
     if(groups.length){TK.data=await tkFetch(TKB+'/api/live?groups='+groups.join(','))}
-    TK.last=Date.now();TK.err=null}
+    TK.last=Date.now();TK.err=null;
+    /* Ereignisse (Tore mit Torschütze) für das angezeigte Spiel, sobald es läuft oder heute gespielt wurde */
+    const g0=tkGames()[0];if(g0&&g0.liveId&&(g0.live||(g0.d<=new Date()&&g0.sh+g0.sg>0))){try{const e=await tkFetch(TKB+'/api/events/'+g0.liveId);if(e&&Array.isArray(e.ev))TK.ev[g0.liveId]=e.ev}catch(e){}}}
   catch(e){TK.err=e}
   try{drawTk()}catch(e){console.error(e)}
   const live=TK.games.some(g=>g.live);TK.timer=setTimeout(tkLoad,TK.err?30000:live?10000:60000)}
@@ -1102,10 +1122,17 @@ function tkGames(){const tl=TK.tl||[],ms=TK.data?.meetings||[],now=new Date(),to
   let list=ours.filter(m=>m.live||m.d.toDateString()===today).sort((a,b)=>(b.live-a.live)||(a.d-b.d));
   if(!list.length){const nx=ours.filter(m=>m.d>now).sort((a,b)=>a.d-b.d)[0];if(nx){nx.next=true;list=[nx]}}
   return list}
+/* Letzter Torschütze aus den Liveticker-Ereignissen: [Typ, Sekunde, Heim, Gast, Seite(1=Heim,0=Gast), Name] – Typ 4 Tor, 5 Siebenmeter, 7 Eigentor */
+function scorerHtml(g){if(!g||!g.liveId)return'';const ev=TK.ev[g.liveId];if(!ev)return'';
+  let x=null;for(let i=ev.length-1;i>=0;i--)if([4,5,7].includes(ev[i][0])){x=ev[i];break}if(!x)return'';
+  const [t,s,ph,pg,side,name]=x,team=side===1?g.home:side===0?g.guest:'',us=team===g.team.name;
+  const key=g.liveId+'|'+ev.length,isNew=TK.lastGoal&&TK.lastGoal!==key;TK.lastGoal=key;
+  const min=s!=null?Math.floor(s/60)+1+'.':'';
+  return `<div class="tsc ${us?'us':''} ${isNew?'flash':''}"><span class="tl">TOR${t===5?' · 7m':t===7?' · Eigentor':''}</span><b>${esc(name||'Torschütze folgt')}</b><small>${esc(team)}${min?' · '+min+' Min':''} · ${ph}:${pg}</small></div>`}
 function drawTk(){const box=$('#tk'),st=$('#tkSt');
   if(TK.data){TK.games=tkGames()}
   const live=TK.games.filter(g=>g.live).length;
-  st.className='stat'+(live?' red':TK.err?'':'');st.innerHTML=live?'<span class="lv">'+live+' LIVE</span>':TK.err?(TK.data?'OFFLINE · '+hm(new Date(TK.last)):'OFFLINE'):'HEUTE';
+  st.className='stat'+(live?' red':'');st.hidden=!TK.err;st.innerHTML=live?'<span class="lv">LIVE</span>':TK.err?(TK.data?'OFFLINE · '+hm(new Date(TK.last)):'OFFLINE'):'';
   if(!TK.data){box.innerHTML='<div class="tkmsg">Kein Empfang – Ticker meldet sich, sobald Internet da ist. Das Board läuft normal weiter.</div>';return}
   if(!TK.games.length){box.innerHTML='<div class="tkmsg">Heute keine Spiele der ausgewählten Mannschaften.</div>';return}
   const img=id=>id?`<img src="${TKB}/api/image/${esc(id)}" alt="" loading="lazy" onerror="this.replaceWith(document.createElement('i'))">`:'<i></i>';
@@ -1118,7 +1145,7 @@ function drawTk(){const box=$('#tk'),st=$('#tkSt');
     const us=n=>n===g.team.name?'us':'';
     return `<div class="tg ${cls}"><div class="lg"><span>${esc(g.team.clubShort||'')} ${esc(g.team.label)}</span><span>${g.next?'Nächstes Spiel':esc(g.team.league||'')}</span></div>
       <div class="tm2 ${us(g.home)}">${img(g.homeImg)}<span>${esc(g.home)}</span></div><div class="sc ${changed?'flash':''}">${mid}</div><div class="tm2 ${us(g.guest)}">${img(g.guestImg)}<span>${esc(g.guest)}</span></div></div>`}).join('')+
-    (TK.games.length>3?`<div class="tkmore">+ ${TK.games.length-3} weitere Spiele heute</div>`:'');try{renderNow()}catch(e){}}
+    (TK.games.length>3?`<div class="tkmore">+ ${TK.games.length-3} weitere Spiele heute</div>`:'')+scorerHtml(show[0]);try{renderNow()}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')tkLoad()});
 window.addEventListener('online',()=>tkLoad());
 
