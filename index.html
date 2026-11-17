@@ -848,10 +848,15 @@ $('#bFade').onclick=fadeAll;$('#bStop').onclick=stopAll;
 $('#bEdit').onclick=()=>{editMode=!editMode;render()};
 $('#main').addEventListener('click',e=>{if(e.target.id==='bEditDone'){editMode=false;render()}});
 $('#bSet').onclick=openSet;
-$('#tabs').addEventListener('click',e=>{if(e.target.closest('[data-newcat]')){openCat(null,id=>{S.settings.tab=id;render()});return}
-  const b=e.target.closest('[data-tab]');if(!b)return;const id=b.dataset.tab;
+/* Kategorien: auf dem iPad schon beim Loslassen des Fingers reagieren (Safari liefert „click“ in Scroll-Listen nicht immer zuverlässig) */
+let tabLast=0,tabDown=null;
+function tabAct(t){const tg=t&&t.closest&&t;if(!tg)return;if(tg.closest('[data-newcat]')){openCat(null,id=>{S.settings.tab=id;render()});return}
+  const b=tg.closest('[data-tab]');if(!b)return;const id=b.dataset.tab;
   if(editMode&&id!=='all'&&S.settings.tab===id){openCat(id);return}
-  S.settings.tab=id;save();render();if(editMode&&id!=='all')toast('Nochmal tippen zum Umbenennen')});
+  S.settings.tab=id;save();render();$('#main').scrollTop=0;if(editMode&&id!=='all')toast('Nochmal tippen zum Umbenennen')}
+$('#tabs').addEventListener('pointerdown',e=>{tabDown={x:e.clientX,y:e.clientY,t:e.target}});
+$('#tabs').addEventListener('pointerup',e=>{if(!tabDown||e.pointerType==='mouse')return;const d=Math.hypot(e.clientX-tabDown.x,e.clientY-tabDown.y);const t=tabDown.t;tabDown=null;if(d>12)return;tabLast=performance.now();tabAct(t)});
+$('#tabs').addEventListener('click',e=>{if(performance.now()-tabLast<600)return;tabAct(e.target)});
 $('#main').addEventListener('click',e=>{const a=e.target.closest('[data-add]');if(a){const c=catOf(a.dataset.add);if(c&&c.players&&c.id===a.dataset.add){const np=mk(c,'Neuer Spieler',null,{nr:''});S.pads.push(np);save();render();openPad(np.id);return}pendingAdd={cat:a.dataset.add};$('#fileIn').click();return}
   const p=e.target.closest('[data-pad]');if(p)tapPad(p.dataset.pad)});
 $('#now').addEventListener('click',e=>{const c=e.target.closest('[data-chip]');if(c){const o=playing.get(c.dataset.chip);if(o&&performance.now()-o.ms<(S.settings.guard??800))return;lg(c.dataset.chip,'Stopp: in „Jetzt läuft“ angetippt');fade(c.dataset.chip)}});
@@ -885,6 +890,7 @@ $('#dSet').addEventListener('input',e=>{const t=e.target,s=S.settings;
   if(t.id==='sFa')s.fadeAll=+t.value;if(t.id==='sXf')s.xfade=+t.value;if(t.id==='sGuard')s.guard=+t.value;if(t.id==='sNorm')s.norm=t.checked;if(t.id==='sDuck')s.duck=+t.value;if(t.id==='sCols')s.cols=+t.value;if(t.id==='sTap')s.tap=t.value;
   if(t.dataset.cn){const c=S.cats.find(x=>x.id===t.dataset.cn);c.name=t.value||'Kategorie'}save()});
 $('#dSet').addEventListener('change',e=>{if(e.target.id==='sTk'){S.settings.tk=e.target.checked;save();tkLoad()}if(e.target.id==='sTkT'){S.settings.tkTeam=e.target.value;TK.prev={};save();tkLoad()}if(e.target.id==='sTap'){S.settings.tap=e.target.value;save()}if(e.target.id==='sDm'){S.settings.duckMode=e.target.value;duck(false);save()}if(e.target.id==='sNorm'){S.settings.norm=e.target.checked;save()}});
+$('#dSet').addEventListener('click',e=>{const sm=e.target.closest('summary');if(sm){e.preventDefault();const d=sm.parentElement;d.open=!d.open}},true);
 $('#dSet').addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
   if(t.id==='sOk'){$('#ovSet').classList.remove('open');render()}
   if(t.id==='cAdd'){openCat(null);return}
