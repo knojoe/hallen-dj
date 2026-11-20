@@ -387,7 +387,7 @@ main{flex:1;min-height:0;overflow-y:auto;gap:8px;padding-bottom:8px}
 {
 const COLORS=['#14b8a6','#0d9488','#22c55e','#10b981','#84cc16','#eab308','#f97316','#ef4444','#ec4899','#a855f7','#6366f1','#3b82f6','#0ea5e9','#64748b'];
 function hue(hex,d){let r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;let H=0,s=0;if(mx!==mn){const e=mx-mn;s=l>.5?e/(2-mx-mn):e/(mx+mn);H=mx===r?(g-b)/e+(g<b?6:0):mx===g?(b-r)/e+2:(r-g)/e+4;H*=60}H=(H+d+360)%360;const f=n=>{const k=(n+H/30)%12,a=s*Math.min(l,1-l);return Math.round((l-a*Math.max(-1,Math.min(k-3,9-k,1)))*255).toString(16).padStart(2,'0')};return '#'+f(0)+f(8)+f(4)}
-const VER='2026-11-20';
+const VER='2026-11-20b';
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -424,11 +424,32 @@ const save=()=>put('state',S).catch(()=>{});
    Lange Songs laufen gestreamt über ein Audio-Element = kaum Speicherbedarf, kein Absturz bei vielen Songs. */
 const AC=window.AudioContext||window.webkitAudioContext;
 /* iPhone/iPad: Wiedergabe-Modus VOR dem Audio-Kontext setzen – sonst schaltet der Stumm-Schalter den Ton ab */
-try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
-const ctx=new AC({latencyHint:'interactive'});
-const master=ctx.createGain(),duckG=ctx.createGain(),lim=ctx.createDynamicsCompressor();
-try{lim.threshold.value=-1.5;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=.002;lim.release.value=.15}catch(e){}
-master.connect(duckG);duckG.connect(lim);lim.connect(ctx.destination);
+let ctx,master,duckG,lim,DK,ctxN=0;
+/* Audio-Kette (neu) aufbauen. Wird beim Start einmal aufgerufen – und erneut, wenn iOS die Audio-Ausgabe nach einer Pause „einschlafen“ lässt
+   (Zeit steht, kein Ton, Kachel blinkt nur). Ein neu aufgebauter Kontext innerhalb einer Berührung läuft sofort wieder. */
+function buildCtx(){ctxN++;
+  try{if(navigator.audioSession)navigator.audioSession.type='playback'}catch(e){}
+  ctx=new AC({latencyHint:'interactive'});
+  master=ctx.createGain();duckG=ctx.createGain();lim=ctx.createDynamicsCompressor();
+  try{lim.threshold.value=-1.5;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=.002;lim.release.value=.15}catch(e){}
+  master.connect(duckG);duckG.connect(lim);lim.connect(ctx.destination);
+  DK={A:ctx.createGain(),B:ctx.createGain()};DK.A.connect(master);DK.B.connect(master);
+  master.gain.value=vol(S.settings.master);
+  /* unhörbarer Dauerton (Wert 0) hält die Audio-Ausgabe wach, auch wenn minutenlang nichts gespielt wird */
+  try{const k=ctx.createConstantSource();k.offset.value=0;const kg=ctx.createGain();kg.gain.value=0;k.connect(kg);kg.connect(ctx.destination);k.start()}catch(e){}
+  ctx.onstatechange=()=>{lg('iPad','Audio-Status: '+ctx.state);if(ctx.state!=='running'&&playing.size)toast('Audio wurde vom iPad unterbrochen – Pad antippen zum Fortsetzen')};
+  HB.ct=-1;HB.frozen=false;HB.res=0}
+/* Herzschlag: läuft die Audio-Uhr wirklich weiter? */
+const HB={ct:-1,t:0,frozen:false,res:0};
+setInterval(()=>{if(!ctx)return;const now=performance.now();if(ctx.state!=='running'){HB.ct=-1;return}
+  if(ctx.currentTime!==HB.ct){HB.ct=ctx.currentTime;HB.t=now;HB.frozen=false}
+  else if(now-HB.t>1500&&!HB.frozen&&document.visibilityState==='visible'){HB.frozen=true;lg('iPad','Audio-Uhr steht still – wird beim nächsten Antippen neu gestartet')}},500);
+function rebuildAudio(why){lg('iPad','Audio neu gestartet ('+why+')');
+  for(const id of [...playing.keys()])kill(id);PEND.clear();loading.clear();
+  for(const [sid,s] of [...SND])if(s.kind==='media'){try{s.el.pause();URL.revokeObjectURL(s.url);s.el.removeAttribute('src');s.el.load()}catch(e){}SND.delete(sid)}
+  const old=ctx;try{old.onstatechange=null;old.close()}catch(e){}
+  buildCtx();ctx.resume().catch(()=>{});ducked=false;const b=document.getElementById('bMic');if(b){b.classList.remove('on');b.textContent='Sprecher'}
+  try{renderNow();paint()}catch(e){}}
 const SND=new Map(),AN=new Map(),playing=new Map(),loading=new Map();
 /* Alles läuft als Web Audio (iOS blockiert den Audio-Player in der App). Speicher-Limit mit LRU: selten genutzte lange Songs werden entladen und beim Antippen neu dekodiert. */
 /* Eigene Seite (GitHub / Home-Bildschirm): lange Songs werden gestreamt = kaum Arbeitsspeicher.
@@ -438,7 +459,6 @@ const SHORT=90,BUDGET=(Math.min(screen.width,screen.height)<600?220:380)*1048576
 function evict(keep){while(bufBytes>BUDGET){let v=null;const busy=new Set([...playing.values()].map(o=>o.s));
   for(const [sid,s] of SND)if(s.kind==='buf'&&sid!==keep&&!sid.startsWith('gen:')&&!busy.has(s)&&(!v||(s.last||0)<(v[1].last||0)))v=[sid,s];
   if(!v)break;SND.delete(v[0]);bufBytes-=bytes(v[1].buf);for(const p of S.pads)if(p.soundId===v[0]){const e=padEls.get(p.id);if(e)e.el.classList.add('ld')}}}
-const DK={A:ctx.createGain(),B:ctx.createGain()};DK.A.connect(master);DK.B.connect(master);
 const MX={x:0,target:null,deck:{A:null,B:null},anim:0};
 function setX(v,fromSlider){MX.x=Math.min(1,Math.max(0,v));const a=Math.cos(MX.x*Math.PI/2),b=Math.sin(MX.x*Math.PI/2);
   DK.A.gain.setTargetAtTime(a,ctx.currentTime,.015);DK.B.gain.setTargetAtTime(b,ctx.currentTime,.015);
@@ -447,7 +467,7 @@ function setX(v,fromSlider){MX.x=Math.min(1,Math.max(0,v));const a=Math.cos(MX.x
 const deckLive=d=>{const id=MX.deck[d];return id&&playing.has(id)&&!playing.get(id).fading};
 function autoDeck(){if(MX.target)return MX.target;const loud=MX.x<=.5?'A':'B',quiet=loud==='A'?'B':'A';return deckLive(loud)?quiet:loud}
 const vol=v=>Math.pow(Math.max(0,v)/100,2);
-master.gain.value=vol(S.settings.master);
+buildCtx();
 
 function gen(kind){
   const sr=ctx.sampleRate;
@@ -507,10 +527,15 @@ function prime(){
   if(!EMBED)return; /* auf eigener Seite übernimmt navigator.audioSession den Stumm-Schalter; kein stilles Audio, das Streams stören könnte */
   try{if(!silentEl){silentEl=document.createElement('audio');silentEl.setAttribute('playsinline','');silentEl.loop=true;silentEl.preload='auto';silentEl.src=silentWav()}
     if(silentEl.paused){const pr=silentEl.play();if(pr&&pr.catch)pr.catch(()=>{})}}catch(e){}}
-const unlock=()=>{prime();if(ctx.state!=='running')ctx.resume().catch(()=>{});unlockMedia();keepAwake()};
+const unlock=()=>{const st=ctx.state,now=performance.now();
+  /* hängt die Audio-Ausgabe, wird sie hier – innerhalb der Berührung – neu aufgebaut; dann klingt der Sound sofort */
+  if(st==='running'&&HB.ct===ctx.currentTime&&now-HB.t>900)HB.frozen=true;
+  if(st==='closed'||HB.frozen||(st!=='running'&&HB.res&&now-HB.res>1200))rebuildAudio(HB.frozen?'Uhr stand still':'Status '+st);
+  else if(st!=='running'){if(!HB.res)HB.res=now;ctx.resume().then(()=>{HB.res=0}).catch(()=>{})}
+  prime();unlockMedia();keepAwake()};
 let wl=null;async function keepAwake(){try{if(!wl&&navigator.wakeLock){wl=await navigator.wakeLock.request('screen');wl.addEventListener('release',()=>wl=null)}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){keepAwake();if(ctx.state!=='running')ctx.resume().catch(()=>{})}});
-ctx.onstatechange=()=>{if(ctx.state!=='running'&&playing.size){toast('Audio wurde vom iPad unterbrochen – Pad antippen zum Fortsetzen');LOG.push({t:new Date(),n:'iPad',ev:'Audio unterbrochen ('+ctx.state+')'})}};
+
 
 function play(p,preview){
   unlock();if(!p.soundId){if(!preview)openPad(p.id);return}
@@ -555,7 +580,8 @@ function start(p,s,preview){try{
       if(!o.done&&!o.fading&&playing.get(key)===o&&el.currentTime<o.en-1&&(o.retry=(o.retry||0)+1)<=3){lg(key,'Vorzeitig beendet bei '+el.currentTime.toFixed(1)+' s – automatisch fortgesetzt');el.play().catch(()=>{});return}lg(key,'Ende: Song zu Ende');end(o)};
     const pr=el.play();if(pr&&pr.catch)pr.catch(err=>{if(playing.get(key)===o){lg(key,'play() abgelehnt: '+(err&&err.name||err));toast('iPad hat den Start blockiert – Pad nochmal antippen');lg(key,'Fehler: Start vom iPad blockiert');end(o)}})}
   playing.set(key,o);renderNow();paint();
-  setTimeout(()=>{if(ctx.state!=='running'&&playing.get(key)===o){lg(key,'Ton blockiert – Audio-Status: '+ctx.state);ctx.resume().catch(()=>{});toast('Kein Ton? Stumm-Schalter am Gerät prüfen und Lautstärke hochdrehen – dann Pad nochmal antippen')}},450)
+  const ct0=ctx.currentTime,cx=ctx;
+  setTimeout(()=>{if(playing.get(key)!==o||cx!==ctx)return;if(ctx.state!=='running'||ctx.currentTime-ct0<.15){lg(key,'Kein Ton – Audio-Uhr steht ('+ctx.state+')');HB.frozen=true;end(o);ctx.resume().catch(()=>{});toast('Audio war eingeschlafen – Pad bitte nochmal antippen')}},700)
 }catch(e){console.error(e);toast('Fehler beim Abspielen von „'+p.name+'“')}}
 function resumeBuf(o,off){try{const src=ctx.createBufferSource();src.buffer=o.s.buf;src.connect(o.g);const now=ctx.currentTime,rest=Math.max(.05,o.len-off);
   src.start(now,o.st+off,rest);o.src=src;o.t0=now-off;src.onended=()=>{if(playing.get(o.key)!==o)return;if(!o.fading)lg(o.key,'Ende: Song zu Ende');end(o)}}catch(e){end(o)}}
@@ -588,7 +614,7 @@ function duck(on){if(on===ducked)return;ducked=on;const t=ctx.currentTime,lv=Mat
   const b=document.getElementById('bMic');if(b){b.classList.toggle('on',on);b.textContent=on?'Sprecher AN':'Sprecher'}}
 
 /* Protokoll: warum ein Sound gestartet/beendet wurde – für die Fehlersuche (Einstellungen → Diagnose) */
-const LOG=[];const nm=id=>{const p=S.pads.find(x=>x.id===id);return p?p.name:id==='pv'?'Vorhören':'?'};
+const LOG=[];const nm=id=>{const p=S.pads.find(x=>x.id===id);return p?p.name:id==='pv'?'Vorhören':id==='iPad'?'iPad':'?'};
 function lg(id,ev){LOG.push({t:new Date(),n:nm(id),ev});if(LOG.length>80)LOG.shift()}
 function tapPad(id){
   const p=S.pads.find(x=>x.id===id);if(!p)return;
