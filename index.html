@@ -26,7 +26,7 @@ body{margin:0;color:var(--ink);font:15px/1.45 Manrope,system-ui,sans-serif;overf
   linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px) 0 0/48px 48px,linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px) 0 0/48px 48px,var(--bg);
   padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
 button,input,select{font:inherit;color:inherit}
-button{cursor:pointer;border:0;background:none}
+button{cursor:pointer;border:0;background:none;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 :focus-visible{outline:2px solid #fff;outline-offset:2px}
 /* Kopfleiste */
 .top{display:flex;align-items:center;gap:12px;padding:10px 14px;margin:10px 12px 0;background:rgba(17,22,32,.82);border:1px solid var(--line);border-radius:16px}
@@ -117,6 +117,11 @@ input[type=range]{flex:1;height:40px;accent-color:#14b8a6;background:none}
 .miss div{flex:1 1 260px}.miss b{display:block;font:800 15px Manrope;color:#ffd77a}.miss span{font-size:13px;color:#d9c79a}
 .sec.over{outline:3px dashed #fff;outline-offset:-3px;background:rgba(255,255,255,.06)}
 .pad.dragging{opacity:.25}
+@keyframes wig{0%{transform:rotate(-.9deg)}100%{transform:rotate(.9deg)}}
+body.editing .pad[data-pad]:not(.dragging):not(.ghost){animation:wig .16s ease-in-out infinite alternate}
+body.editing .pad[data-pad]:nth-child(2n):not(.dragging):not(.ghost){animation-delay:-.08s;animation-duration:.18s}
+.pad.lift{transform:scale(1.06);transition:transform .18s;box-shadow:0 14px 30px rgba(0,0,0,.55)}
+@media(prefers-reduced-motion:reduce){body.editing .pad[data-pad]{animation:none}}
 .pad.ghost,.ghost{position:fixed;margin:0;z-index:40;pointer-events:none;max-width:200px;transform:translate(-50%,-50%) rotate(-3deg) scale(1.05);box-shadow:0 18px 40px rgba(0,0,0,.6);opacity:.95}
 .dropmark{outline:3px solid #fff;outline-offset:2px}
 .tab.dropmark{outline-offset:-2px;background:#fff;color:#000;transform:scale(1.08)}
@@ -382,6 +387,7 @@ main{flex:1;min-height:0;overflow-y:auto;gap:8px;padding-bottom:8px}
 {
 const COLORS=['#14b8a6','#0d9488','#22c55e','#10b981','#84cc16','#eab308','#f97316','#ef4444','#ec4899','#a855f7','#6366f1','#3b82f6','#0ea5e9','#64748b'];
 function hue(hex,d){let r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;let H=0,s=0;if(mx!==mn){const e=mx-mn;s=l>.5?e/(2-mx-mn):e/(mx+mn);H=mx===r?(g-b)/e+(g<b?6:0):mx===g?(b-r)/e+2:(r-g)/e+4;H*=60}H=(H+d+360)%360;const f=n=>{const k=(n+H/30)%12,a=s*Math.min(l,1-l);return Math.round((l-a*Math.max(-1,Math.min(k-3,9-k,1)))*255).toString(16).padStart(2,'0')};return '#'+f(0)+f(8)+f(4)}
+const VER='2026-11-20';
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -463,9 +469,10 @@ function analyze(b){const n=b.length,chs=[];for(let c=0;c<Math.min(2,b.numberOfC
 const normDb=sid=>{const a=AN.get(sid);if(!a||S.settings.norm===false)return 0;let g=Math.max(-15,Math.min(12,-17-a.L));return Math.min(g,-20*Math.log10(Math.max(a.peak,1e-4))+4)};
 const bytes=b=>b.length*b.numberOfChannels*4;
 const decode=async blob=>{const ab=await blob.arrayBuffer();return await new Promise((res,rej)=>{const r=ctx.decodeAudioData(ab,res,rej);if(r&&r.catch)r.catch(rej)})};
-function mkMedia(blob,dur){const el=new Audio();el.preload='auto';el.playsInline=true;el.setAttribute('playsinline','');el.crossOrigin='anonymous';el.src=URL.createObjectURL(blob);
-  let node=null;try{node=ctx.createMediaElementSource(el)}catch(e){}
-  return{kind:'media',el,node,dur,url:el.src}}
+function mkMedia(blob,dur){const el=new Audio();el.preload='metadata';el.playsInline=true;el.setAttribute('playsinline','');el.crossOrigin='anonymous';el.src=URL.createObjectURL(blob);
+  return{kind:'media',el,node:null,dur,url:el.src}}
+/* Web-Audio-Knoten erst beim ersten Abspielen anlegen – spart bei vielen Songs Speicher */
+function mediaNode(s){if(!s.node&&!s.noNode){try{s.node=ctx.createMediaElementSource(s.el)}catch(e){s.noNode=true;lg('?','Hinweis: Song läuft ohne Web-Audio-Kette ('+(e&&e.message||e)+')')}}return s.node}
 function ensure(sid){
   if(!sid)return Promise.resolve(null);if(SND.has(sid))return Promise.resolve(SND.get(sid));if(loading.has(sid))return loading.get(sid);
   const pr=(async()=>{let s;
@@ -480,6 +487,7 @@ function ensure(sid){
   loading.set(sid,pr);return pr}
 function drop(sid){loading.delete(sid);const s=SND.get(sid);if(s){if(s.kind==='buf')bufBytes-=bytes(s.buf);else{try{s.el.pause();URL.revokeObjectURL(s.url);s.el.removeAttribute('src');s.el.load()}catch(e){}}}
   SND.delete(sid);AN.delete(sid);del('an:'+sid).catch(()=>{})}
+const STANDALONE=(()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}})();let PERSIST=null;
 const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 function unlockMedia(){if(!IOS)return;/* nie, während ein gestreamter Song läuft – auf dem iPhone könnte das stumme Freischalten ihn stören */for(const o of playing.values())if(o.s.kind==='media')return;
   for(const s of SND.values())if(s.kind==='media'&&!s.ok&&!s.live&&!s.trying){s.trying=true;const el=s.el;el.muted=true;
@@ -508,9 +516,14 @@ function play(p,preview){
   unlock();if(!p.soundId){if(!preview)openPad(p.id);return}
   const s=SND.get(p.soundId);
   if(s)return start(p,s,preview);
+  const key=preview?'pv':p.id;
+  /* Pad lädt noch: zweites Antippen wird ignoriert statt doppelt zu starten */
+  if(PEND.has(key)){lg(key,'Lädt noch – zweites Antippen ignoriert');toast('„'+p.name+'“ lädt noch …');return}
+  const tok={};PEND.set(key,tok);
   const pe=padEls.get(p.id);if(pe)pe.el.classList.add('ld');
-  ensure(p.soundId).then(x=>{if(x)start(p,x,preview);else toast('Datei fehlt – bitte im Pad neu wählen')})
-    .catch(e=>{const pe=padEls.get(p.id);if(pe)pe.el.classList.remove('ld');toast('„'+p.name+'“ kann nicht gelesen werden'+(e&&e.message?': '+e.message:''))})}
+  ensure(p.soundId).then(x=>{if(PEND.get(key)!==tok)return;PEND.delete(key);if(x)start(p,x,preview);else toast('Datei fehlt – bitte im Pad neu wählen')})
+    .catch(e=>{if(PEND.get(key)===tok)PEND.delete(key);const pe=padEls.get(p.id);if(pe)pe.el.classList.remove('ld');lg(key,'Fehler beim Laden: '+(e&&e.message||e));toast('„'+p.name+'“ kann nicht gelesen werden'+(e&&e.message?': '+e.message:''))})}
+const PEND=new Map();
 function start(p,s,preview){try{
   if(!p.dur){p.dur=s.dur;save()}
   let dest=master,dk=null;
@@ -531,15 +544,16 @@ function start(p,s,preview){try{
       /* Wächter: endet ein Sound ohne Grund deutlich vor seinem Ende, wird er an der Stelle fortgesetzt */
       const el=ctx.currentTime-o.t0;if(!o.done&&!o.fading&&!o.loop&&el<o.len-.3&&(o.retry=(o.retry||0)+1)<=3){lg(key,'Vorzeitig beendet bei '+el.toFixed(1)+' s – automatisch fortgesetzt');resumeBuf(o,el);return}
       if(!o.fading)lg(key,'Ende: Song zu Ende');end(o)}}
-  else{const el=s.el;s.live=true;el.muted=false;
-    if(s.node){try{s.node.disconnect()}catch(e){}s.node.connect(g)}else el.volume=Math.min(1,v);
+  else{const el=s.el;s.live=true;el.muted=false;el.preload='auto';o.v=v;const nd=mediaNode(s);
+    if(nd){try{nd.disconnect()}catch(e){}nd.connect(g);el.volume=1}else el.volume=Math.min(1,v*master.gain.value);
     try{el.currentTime=st}catch(e){}
     if(el.readyState<1)el.addEventListener('loadedmetadata',()=>{if(playing.get(key)===o){try{el.currentTime=st}catch(e){}}},{once:true});
-    el.addEventListener('playing',()=>{o.started=true},{once:true});
-    el.onpause=()=>{if(o.done||o.fading||playing.get(key)!==o||el.ended)return;if((o.retry=(o.retry||0)+1)>3)return;lg(key,'Vom Browser angehalten bei '+el.currentTime.toFixed(1)+' s – automatisch fortgesetzt');el.play().catch(()=>{})};
+    el.addEventListener('playing',()=>{if(playing.get(key)!==o)return;if(!o.started){o.started=true;o.ms=performance.now();o.lt=el.currentTime;o.lp=o.ms;const pe=padEls.get(p.id);if(pe)pe.el.classList.remove('ld')}},{once:true});
+    if(!preview){const pe=padEls.get(p.id);if(pe&&el.readyState<3)pe.el.classList.add('ld')}
+    el.onpause=()=>{if(!el.paused||o.done||o.fading||playing.get(key)!==o||el.ended)return; /* verspätetes Pause-Ereignis vom vorherigen Durchlauf desselben Songs ignorieren */if((o.retry=(o.retry||0)+1)>3){lg(key,'Vom Browser angehalten – nach 3 Versuchen aufgegeben');end(o);return}lg(key,'Vom Browser angehalten bei '+el.currentTime.toFixed(1)+' s – automatisch fortgesetzt');setTimeout(()=>{if(!o.done&&playing.get(key)===o&&el.paused)el.play().catch(()=>{})},120)};
     el.onended=()=>{if(o.loop&&!o.fading&&playing.get(key)===o){try{el.currentTime=o.st}catch(e){}el.play().catch(()=>{});return}
       if(!o.done&&!o.fading&&playing.get(key)===o&&el.currentTime<o.en-1&&(o.retry=(o.retry||0)+1)<=3){lg(key,'Vorzeitig beendet bei '+el.currentTime.toFixed(1)+' s – automatisch fortgesetzt');el.play().catch(()=>{});return}lg(key,'Ende: Song zu Ende');end(o)};
-    const pr=el.play();if(pr&&pr.catch)pr.catch(()=>{if(playing.get(key)===o){toast('iPad hat den Start blockiert – Pad nochmal antippen');lg(key,'Fehler: Start vom iPad blockiert');end(o)}})}
+    const pr=el.play();if(pr&&pr.catch)pr.catch(err=>{if(playing.get(key)===o){lg(key,'play() abgelehnt: '+(err&&err.name||err));toast('iPad hat den Start blockiert – Pad nochmal antippen');lg(key,'Fehler: Start vom iPad blockiert');end(o)}})}
   playing.set(key,o);renderNow();paint();
   setTimeout(()=>{if(ctx.state!=='running'&&playing.get(key)===o){lg(key,'Ton blockiert – Audio-Status: '+ctx.state);ctx.resume().catch(()=>{});toast('Kein Ton? Stumm-Schalter am Gerät prüfen und Lautstärke hochdrehen – dann Pad nochmal antippen')}},450)
 }catch(e){console.error(e);toast('Fehler beim Abspielen von „'+p.name+'“')}}
@@ -551,17 +565,21 @@ function cleanup(o){o.done=true;clearTimeout(o.tm);
   setTimeout(()=>{try{o.g.disconnect()}catch(e){}},50)}
 function end(o){if(playing.get(o.key)!==o)return;playing.delete(o.key);cleanup(o);if(o.dk&&MX.deck[o.dk]===o.key)MX.deck[o.dk]=null;renderNow();paint()}
 const pos=o=>{if(o.s.kind==='media')return Math.max(0,Math.min(o.len,o.s.el.currentTime-o.st));const e=ctx.currentTime-o.t0;return o.loop?e%o.len:Math.min(e,o.len)};
-function tickMedia(){for(const o of playing.values()){if(o.s.kind!=='media'||!o.started||o.fading)continue;const ct=o.s.el.currentTime;
+function tickMedia(){const nowMs=performance.now();for(const o of playing.values()){if(o.s.kind!=='media')continue;const el=o.s.el;
+  if(!o.s.node&&o.vf){const k=Math.max(0,1-(nowMs-o.vf.t)/o.vf.d);el.volume=Math.max(0,Math.min(1,o.vf.v*k))}
+  if(!o.started||o.fading)continue;const ct=el.currentTime;
+  /* Hänger-Wächter: Zeit steht > 2,5 s still, obwohl nicht pausiert → neu anstoßen */
+  if(ct!==o.lt){o.lt=ct;o.lp=nowMs}else if(!el.paused&&nowMs-o.lp>2500&&!o.done){o.lp=nowMs;if((o.stall=(o.stall||0)+1)<=3){lg(o.key,'Song hing bei '+ct.toFixed(1)+' s – neu angestoßen');try{el.currentTime=ct+.01}catch(e){}el.play().catch(()=>{})}}
   /* nur beenden, wenn der Song wirklich vom Startpunkt bis zum Endpunkt gelaufen ist – nicht, weil ein alter Abspielstand noch drinsteht */
   if(o.en<o.s.dur-.05&&ct>=o.en-.02&&ct>o.st+.2&&performance.now()-o.ms>300){if(o.loop){try{o.s.el.currentTime=o.st}catch(e){}}else{lg(o.key,'Ende: Endpunkt erreicht');end(o)}}}}
 function fade(id,t){const o=playing.get(id);if(!o||o.fading)return;const p=S.pads.find(x=>x.id===id);
   t=t??(p?p.fadeOut:1);t=Math.max(t,.03);const now=ctx.currentTime;o.fading=true;
   o.g.gain.cancelScheduledValues(now);o.g.gain.setValueAtTime(Math.max(.0001,o.g.gain.value),now);o.g.gain.linearRampToValueAtTime(0.0001,now+t);
-  if(o.s.kind==='buf'){try{o.src.stop(now+t+.02)}catch(e){}}else o.tm=setTimeout(()=>end(o),(t+.05)*1000);
+  if(o.s.kind==='buf'){try{o.src.stop(now+t+.02)}catch(e){}}else{if(!o.s.node)o.vf={t:performance.now(),d:t*1000,v:o.s.el.volume};o.tm=setTimeout(()=>end(o),(t+.05)*1000)}
   renderNow();paint()}
 function kill(id){const o=playing.get(id);if(!o)return;playing.delete(id);cleanup(o);if(o.dk&&MX.deck[o.dk]===id)MX.deck[o.dk]=null}
 const fadeAll=()=>{for(const id of [...playing.keys()]){lg(id,'Ausgeblendet: „Ausblenden“ gedrückt');fade(id,S.settings.fadeAll)}};
-const stopAll=()=>{for(const id of [...playing.keys()]){lg(id,'Stopp: STOP gedrückt');kill(id)}renderNow();paint()};
+const stopAll=()=>{if(PEND.size){for(const k of PEND.keys())lg(k,'Laden abgebrochen: STOP');PEND.clear();document.querySelectorAll('.pad.ld').forEach(e=>{const p=S.pads.find(x=>x.id===e.dataset.pad);if(p&&SND.has(p.soundId))e.classList.remove('ld')})}for(const id of [...playing.keys()]){lg(id,'Stopp: STOP gedrückt');kill(id)}renderNow();paint()};
 
 /* Sprecher-Taste */
 let ducked=false;
@@ -576,6 +594,7 @@ function tapPad(id){
   const p=S.pads.find(x=>x.id===id);if(!p)return;
   if(editMode)return openPad(id);
   const o=playing.get(id),nowMs=performance.now();
+  if(o&&o.s.kind==='media'&&!o.started&&nowMs-o.ms<6000){lg(id,'Song puffert noch – Antippen ignoriert');toast('„'+p.name+'“ startet gleich …');return}
   if(o&&nowMs-o.ms<(S.settings.guard??800)){lg(id,'Doppeltipp ignoriert ('+Math.round(nowMs-o.ms)+' ms nach Start)');return}
   if(o&&!o.fading){const a=S.settings.tap;
     if(a==='fade'){lg(id,'Stopp: angetippt (ausblenden)');return fade(id)}if(a==='stop'){lg(id,'Stopp: angetippt');kill(id);renderNow();paint();return}}
@@ -587,10 +606,14 @@ window.addEventListener('unhandledrejection',e=>{console.error(e.reason);e.preve
 /* ---------- Oberfläche ---------- */
 const catOf=id=>S.cats.find(c=>c.id===id)||S.cats[0];
 const colorOf=p=>p.color||catOf(p.catId)?.color||'#5b6676';
+let tabSig='';
 function renderTabs(){
   const t=S.settings.tab;
   const live=new Set([...playing.entries()].filter(([k,o])=>k!=='pv'&&!o.fading).map(([k])=>(S.pads.find(p=>p.id===k)||{}).catId));
-  $('#tabs').innerHTML=`<button class="tab ${t==='all'?'sel':''} ${live.size?'live':''}" style="--c:#ffffff" data-tab="all"><i></i>Alle</button>`+
+  const sig=t+'|'+editMode+'|'+S.cats.map(c=>c.id+c.name+c.color+S.pads.filter(p=>p.catId===c.id).length).join(',');
+  const nav=$('#tabs');
+  if(sig===tabSig&&nav.children.length){for(const b of nav.querySelectorAll('[data-tab]')){const id=b.dataset.tab;b.classList.toggle('live',id==='all'?live.size>0:live.has(id))}return}
+  tabSig=sig;nav.innerHTML=`<button class="tab ${t==='all'?'sel':''} ${live.size?'live':''}" style="--c:#ffffff" data-tab="all"><i></i>Alle</button>`+
   S.cats.map(c=>`<button class="tab ${t===c.id?'sel':''} ${live.has(c.id)?'live':''}" style="--c:${c.color}" data-tab="${c.id}"><i></i>${esc(c.name)} <b>${editMode?'✎':S.pads.filter(p=>p.catId===c.id).length}</b></button>`).join('')+(editMode?'<button class="tab addc" data-newcat="1">+ Kategorie</button>':'')
 }
 const isPl=p=>!!catOf(p.catId)?.players;
@@ -606,14 +629,14 @@ const addHtml=(cid,pl)=>`<button class="pad add" data-add="${cid}">${pl?'+ Spiel
 const padsOf=c=>{const ps=S.pads.filter(p=>p.catId===c.id);return c.players?ps.slice().sort((a,b)=>(parseInt(a.nr)||999)-(parseInt(b.nr)||999)):ps};
 const padEls=new Map();
 function render(){
-  renderTabs();document.body.classList.toggle('editing',editMode);$('#bEdit').classList.toggle('on',editMode);
+  tabSig='';renderTabs();document.body.classList.toggle('editing',editMode);$('#bEdit').classList.toggle('on',editMode);
   const t=S.settings.tab,m=$('#main');m.style.setProperty('--cols',S.settings.cols);
   const cats=t==='all'?S.cats:S.cats.filter(c=>c.id===t);
   padEls.clear();
   if(!cats.length){m.innerHTML='<div class="empty-st">Keine Kategorie vorhanden – lege eine in den Einstellungen an.</div>';return}
   let n=0;
   const banner=MISSING.size?`<div class="miss"><div><b>${MISSING.size} ${MISSING.size===1?'Song fehlt':'Songs fehlen'}</b><span>Wähle deinen Musik-Ordner – die Songs werden per Dateiname wieder an ihren Platz gesetzt.</span></div><button class="btn pri" id="rlDir">Ordner wählen</button><button class="btn" id="rlFiles">Dateien wählen</button></div>`:'';
-  const eb=editMode?`<div class="editbar"><div><b>Bearbeiten</b><span>Pad antippen = ändern · am Griff ☰ ziehen = verschieben (auch auf die Kategorien links)</span></div><button class="btn pri" id="bEditDone">Fertig</button></div>`:'';
+  const eb=editMode?`<div class="editbar"><div><b>Bearbeiten</b><span>Antippen = ändern · gedrückt halten oder am Griff ☰ ziehen = verschieben (auch auf die Kategorien links)</span></div><button class="btn pri" id="bEditDone">Fertig</button></div>`:'';
   m.innerHTML=eb+banner+cats.map(c=>{const ps=padsOf(c);
     const show=t!=='all'||ps.length||editMode;if(!show)return'';
     return `<section class="sec" data-cat="${c.id}"><h2 style="--c:${c.color};--c2:${hue(c.color,c.players?-35:38)}"><span>${esc(c.name)}</span><small>${ps.length} ${c.players?'Spieler':ps.length===1?'Sound':'Sounds'}</small></h2><div class="grid ${c.players?'plg':''}" style="--cols:${c.players?Math.min(9,S.settings.cols+2):S.settings.cols}">${ps.map(p=>padHtml(p,t==='all'?99:n++)).join('')}${(editMode||!ps.length)?addHtml(c.id,c.players):''}</div></section>`}).join('')||'<div class="empty-st">Noch keine Sounds. Tippe auf „Import“ oder „Bearbeiten“.</div>';
@@ -629,10 +652,11 @@ function updDecks(){if(!S.settings.mixer)return;const nx=autoDeck();
     const lv=d==='A'?Math.cos(MX.x*Math.PI/2):Math.sin(MX.x*Math.PI/2);el.querySelector('.lvl i').style.height=(o?lv*100:0)+'%';
     if(o){const ps=pos(o);el.querySelector('.dt').textContent=o.loop?'Loop '+fmt(ps):'-'+fmt(o.len-ps);el.querySelector('.dbar').style.width=(ps/o.len*100)+'%'}
     else{el.querySelector('.dt').textContent=nx===d?'Pad antippen lädt hierher':' ';el.querySelector('.dbar').style.width='0'}}}
+let nowSig=null;
 function renderNow(){
   renderTabs();updDecks();
   const items=[...playing.entries()].filter(([k])=>k!=='pv');
-  
+  const nsig=items.map(([k])=>k).join(',');if(nsig===nowSig&&$('#now').childElementCount)return;nowSig=nsig;
   $('#now').innerHTML=(items.length?items.map(([id])=>{const p=S.pads.find(x=>x.id===id);if(!p)return'';
     return `<button class="chip" style="--c:${colorOf(p)}" data-chip="${id}"><b>${isPl(p)&&p.nr?'#'+esc(p.nr)+' ':''}${esc(p.name)}</b><div class="bar"><i></i></div><span><em>tippen = aus</em><strong class="rm"></strong></span></button>`}).join(''):'<span class="idle">Bereit</span>')
 }
@@ -721,8 +745,8 @@ function openSet(){const s=S.settings;
    ${slider('sCols','Pads pro Reihe (iPad quer)',s.cols,3,8,1,'')}
   </div></details>
   <details><summary>Diagnose</summary><div class="in"><p class="hint">Hier steht, warum ein Sound gestartet oder beendet wurde – die letzten 80 Ereignisse, neueste oben. Bricht ein Sound unerwartet ab, hier nachschauen oder mir den Text schicken.</p>
-   <div class="diag"><div><b>Audio</b> ${ctx.state} · Modus: ${EMBED?'Vorschau – alles geladen':'eigene Seite – lange Songs gestreamt'} · Wiedergabe-Modus: ${navigator.audioSession?navigator.audioSession.type:'nicht verfügbar'} · Stumm-Schutz: ${silentEl&&!silentEl.paused?'aktiv':'aus'} · Speicher: ${Math.round(bufBytes/1048576)} von ${Math.round(BUDGET/1048576)} MB</div>${LOG.length?LOG.slice().reverse().map(x=>`<div><b>${x.t.toLocaleTimeString('de-DE')}</b> ${esc(x.n)} – ${esc(x.ev)}</div>`).join(''):'<div>Noch keine Ereignisse.</div>'}</div>
-   <div class="acts"><button class="btn" id="bDiag">Als Text kopieren</button></div></div></details>
+   <div class="diag"><div><b>Version</b> ${VER} · ${STANDALONE?'Home-Bildschirm-App':EMBED?'Claude-Vorschau':'Browser-Tab'} · Speicher dauerhaft: ${PERSIST===true?'ja':PERSIST===false?'nein':'?'}</div><div><b>Audio</b> ${ctx.state} · Modus: ${EMBED?'Vorschau – alles geladen':'eigene Seite – lange Songs gestreamt'} · Wiedergabe-Modus: ${navigator.audioSession?navigator.audioSession.type:'nicht verfügbar'} · Stumm-Schutz: ${silentEl&&!silentEl.paused?'aktiv':'aus'} · Speicher: ${Math.round(bufBytes/1048576)} von ${Math.round(BUDGET/1048576)} MB</div>${LOG.length?LOG.slice().reverse().map(x=>`<div><b>${x.t.toLocaleTimeString('de-DE')}</b> ${esc(x.n)} – ${esc(x.ev)}</div>`).join(''):'<div>Noch keine Ereignisse.</div>'}</div>
+   <div class="acts"><button class="btn" id="bDiag">Als Text kopieren</button><button class="btn" id="bDiagClr">Protokoll leeren</button></div></div></details>
   <details><summary>WümmeTicker</summary><div class="in">
    <label class="chk"><input type="checkbox" id="sTk" ${s.tk!==false?'checked':''}> Spielstände links in der Seitenleiste zeigen</label>
    <label class="fld"><span>Mannschaft</span><select id="sTkT"><option value="">Alle Mannschaften – heutige Spiele</option>${(TK.club?.teams||[]).map(t=>{const v=t.group+'|'+t.label;return `<option value="${esc(v)}" ${tkSel()===v?'selected':''}>${esc(t.clubShort+' '+t.label)} · ${esc(t.league)}</option>`}).join('')}</select></label>
@@ -858,7 +882,13 @@ $('#tabs').addEventListener('pointerdown',e=>{tabDown={x:e.clientX,y:e.clientY,t
 $('#tabs').addEventListener('pointerup',e=>{if(!tabDown||e.pointerType==='mouse')return;const d=Math.hypot(e.clientX-tabDown.x,e.clientY-tabDown.y);const t=tabDown.t;tabDown=null;if(d>12)return;tabLast=performance.now();tabAct(t)});
 $('#tabs').addEventListener('click',e=>{if(performance.now()-tabLast<600)return;tabAct(e.target)});
 $('#main').addEventListener('click',e=>{const a=e.target.closest('[data-add]');if(a){const c=catOf(a.dataset.add);if(c&&c.players&&c.id===a.dataset.add){const np=mk(c,'Neuer Spieler',null,{nr:''});S.pads.push(np);save();render();openPad(np.id);return}pendingAdd={cat:a.dataset.add};$('#fileIn').click();return}
-  const p=e.target.closest('[data-pad]');if(p)tapPad(p.dataset.pad)});
+  const p=e.target.closest('[data-pad]');if(p){if(performance.now()-padLast<700&&padLastId===p.dataset.pad)return;tapPad(p.dataset.pad)}});
+/* Pads auf dem iPad schon beim Loslassen auslösen – Safari verschluckt „click“ in scrollenden Bereichen manchmal.
+   Nur im Spielbetrieb und nur für Pads mit Song (sonst öffnet sich ein Fenster, das den nachfolgenden Klick abbekommen würde). */
+let padDown=null,padLast=0,padLastId='';
+$('#main').addEventListener('pointerdown',e=>{padDown=null;if(e.pointerType==='mouse'||editMode||e.target.closest('[data-grip]'))return;const b=e.target.closest('[data-pad]');if(!b)return;const p=S.pads.find(x=>x.id===b.dataset.pad);if(!p||!p.soundId||MISSING.has(p.soundId))return;padDown={x:e.clientX,y:e.clientY,id:b.dataset.pad,pid:e.pointerId,sy:$('#main').scrollTop}});
+$('#main').addEventListener('pointerup',e=>{const d=padDown;padDown=null;if(!d||e.pointerId!==d.pid||DG.on)return;if(Math.hypot(e.clientX-d.x,e.clientY-d.y)>14||Math.abs($('#main').scrollTop-d.sy)>4)return;padLast=performance.now();padLastId=d.id;tapPad(d.id)});
+$('#main').addEventListener('pointercancel',()=>{padDown=null});
 $('#now').addEventListener('click',e=>{const c=e.target.closest('[data-chip]');if(c){const o=playing.get(c.dataset.chip);if(o&&performance.now()-o.ms<(S.settings.guard??800))return;lg(c.dataset.chip,'Stopp: in „Jetzt läuft“ angetippt');fade(c.dataset.chip)}});
 $('#fileIn').addEventListener('change',async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length||!pendingAdd)return;
   const pa=pendingAdd;pendingAdd=null;
@@ -901,7 +931,8 @@ $('#dSet').addEventListener('click',async e=>{const t=e.target.closest('button')
     S.cats=S.cats.filter(x=>x.id!==d.cx);S.pads.forEach(p=>{if(p.catId===d.cx)p.catId=S.cats[0].id});if(S.settings.tab===d.cx)S.settings.tab='all';renderCats()}
   if(t.id==='lgPick'){$('#logoIn').click();return}
   if(t.id==='lgDel'){await del('logo');showLogo(null);openSet();return}
-  if(t.id==='bDiag'){const txt=LOG.map(x=>x.t.toLocaleTimeString('de-DE')+' '+x.n+' – '+x.ev).join('\n')+'\nAudio: '+ctx.state+' · Mixer: '+(S.settings.mixer?'an':'aus')+' · Antippen: '+S.settings.tap+' · '+navigator.userAgent;try{await navigator.clipboard.writeText(txt);toast('Protokoll kopiert')}catch(e){toast('Kopieren nicht möglich')}return}
+  if(t.id==='bDiagClr'){LOG.length=0;openSet();toast('Protokoll geleert');return}
+  if(t.id==='bDiag'){const txt='Hallen-DJ '+VER+' · '+(STANDALONE?'Home-Bildschirm':EMBED?'Vorschau':'Browser')+' · dauerhaft: '+PERSIST+'\n'+LOG.map(x=>x.t.toLocaleTimeString('de-DE')+' '+x.n+' – '+x.ev).join('\n')+'\nAudio: '+ctx.state+' · Mixer: '+(S.settings.mixer?'an':'aus')+' · Antippen: '+S.settings.tap+' · '+navigator.userAgent;try{await navigator.clipboard.writeText(txt);toast('Protokoll kopiert')}catch(e){toast('Kopieren nicht möglich')}return}
   if(t.id==='bExpL')exportLight();
   if(t.id==='bExp')exportBak();
   if(t.id==='bImp')$('#bakIn').click();
@@ -1084,16 +1115,34 @@ function dgEnd(commit){cancelAnimationFrame(DG.scroll);document.body.classList.r
       save();render();toast('„'+p.name+'“ → '+catOf(p.catId).name)}
     DG.suppress=true;setTimeout(()=>DG.suppress=false,400)}
   try{DG.grip&&DG.pid!=null&&DG.grip.releasePointerCapture(DG.pid)}catch(e){}
-  DG.on=false;DG.id=null;DG.tgt=null;DG.ghost=null;DG.grip=null;DG.pid=null}
+  DG.on=false;DG.id=null;DG.tgt=null;DG.ghost=null;DG.grip=null;DG.pid=null;
+  if(LP.late){LP.late=false;render()}}
 function dgAuto(){const m=$('#main'),r=m.getBoundingClientRect();let v=0;if(DG.y>r.top&&DG.y<r.top+80)v=-16;else if(DG.y>r.bottom-80)v=16;if(v){m.scrollTop+=v;DG.tgt=dgTarget(DG.x,DG.y)}DG.scroll=requestAnimationFrame(dgAuto)}
 /* Ziehen startet nur am Griff (☰ oben rechts) – sofort, ohne langes Drücken. touch-action:none am Griff verhindert, dass das iPad stattdessen scrollt. */
-$('#main').addEventListener('pointerdown',e=>{const g=e.target.closest('[data-grip]');if(!g||!editMode)return;e.preventDefault();e.stopPropagation();
-  const pad=g.closest('.pad[data-pad]');DG.id=pad.dataset.pad;DG.x=e.clientX;DG.y=e.clientY;DG.grip=g;DG.pid=e.pointerId;
-  try{g.setPointerCapture(e.pointerId)}catch(x){}
+function dgStart(pad,g,x,y,pid){DG.id=pad.dataset.pad;DG.x=x;DG.y=y;DG.grip=g;DG.pid=pid;
+  try{g.setPointerCapture(pid)}catch(e){}
   DG.on=true;document.body.classList.add('dragging-now');pad.classList.add('dragging');
   const gh=pad.cloneNode(true);gh.classList.add('ghost');gh.classList.remove('dragging');gh.querySelector('.grip')?.remove();
   gh.style.width=pad.offsetWidth+'px';gh.style.left=DG.x+'px';gh.style.top=DG.y+'px';document.body.appendChild(gh);DG.ghost=gh;
-  DG.scroll=requestAnimationFrame(dgAuto)});
+  DG.scroll=requestAnimationFrame(dgAuto)}
+$('#main').addEventListener('pointerdown',e=>{const g=e.target.closest('[data-grip]');if(!g||!editMode)return;e.preventDefault();e.stopPropagation();
+  dgStart(g.closest('.pad[data-pad]'),g,e.clientX,e.clientY,e.pointerId)});
+/* Wie beim iPhone-Homescreen: Kachel gedrückt halten → Bearbeiten-Modus (Kacheln wackeln) und die Kachel hängt direkt am Finger.
+   Ohne Loslassen in eine andere Kategorie (links) oder zwischen andere Kacheln ziehen. Loslassen ohne Bewegen = Bearbeiten-Modus bleibt an. */
+const LP={t:0,x:0,y:0,pid:null,pad:null,sy:0};
+function lpCancel(){clearTimeout(LP.t);LP.t=0;if(LP.pad)LP.pad.classList.remove('lift');LP.pad=null}
+$('#main').addEventListener('pointerdown',e=>{lpCancel();if(DG.on||e.button>0||e.target.closest('[data-grip]'))return;const pad=e.target.closest('.pad[data-pad]');if(!pad)return;
+  LP.x=e.clientX;LP.y=e.clientY;LP.pid=e.pointerId;LP.pad=pad;LP.sy=$('#main').scrollTop;
+  LP.t=setTimeout(()=>{LP.t=0;const pd=LP.pad;if(!pd||!pd.isConnected||Math.abs($('#main').scrollTop-LP.sy)>4){lpCancel();return}
+    pd.classList.remove('lift');LP.pad=null;padDown=null;
+    try{navigator.vibrate&&navigator.vibrate(15)}catch(x){}
+    if(!editMode){editMode=true;document.body.classList.add('editing');$('#bEdit').classList.add('on');LP.late=true}
+    dgStart(pd,$('#main'),LP.x,LP.y,LP.pid);toast('Ziehen: auf eine Kategorie links oder zwischen andere Kacheln')},520);
+  setTimeout(()=>{if(LP.t&&LP.pad===pad)pad.classList.add('lift')},180)});
+$('#main').addEventListener('pointermove',e=>{if(LP.t&&e.pointerId===LP.pid&&Math.hypot(e.clientX-LP.x,e.clientY-LP.y)>10)lpCancel()});
+['pointerup','pointercancel'].forEach(n=>$('#main').addEventListener(n,()=>{if(LP.t)lpCancel()}));
+$('#main').addEventListener('scroll',()=>{if(LP.t)lpCancel()},{passive:true});
+$('#main').addEventListener('contextmenu',e=>{if(e.target.closest('.pad'))e.preventDefault()});
 document.addEventListener('pointermove',e=>{if(!DG.on||e.pointerId!==DG.pid)return;e.preventDefault();DG.x=e.clientX;DG.y=e.clientY;
   DG.ghost.style.left=DG.x+'px';DG.ghost.style.top=DG.y+'px';DG.tgt=dgTarget(DG.x,DG.y)},{passive:false});
 document.addEventListener('pointerup',e=>{if(DG.on&&e.pointerId===DG.pid)dgEnd(true)});
@@ -1151,7 +1200,7 @@ function drawTk(){const box=$('#tk'),st=$('#tkSt');
     const us=n=>n===g.team.name?'us':'';
     return `<div class="tg ${cls}"><div class="lg"><span>${esc(g.team.clubShort||'')} ${esc(g.team.label)}</span><span>${g.next?'Nächstes Spiel':esc(g.team.league||'')}</span></div>
       <div class="tm2 ${us(g.home)}">${img(g.homeImg)}<span>${esc(g.home)}</span></div><div class="sc ${changed?'flash':''}">${mid}</div><div class="tm2 ${us(g.guest)}">${img(g.guestImg)}<span>${esc(g.guest)}</span></div></div>`}).join('')+
-    (TK.games.length>3?`<div class="tkmore">+ ${TK.games.length-3} weitere Spiele heute</div>`:'')+scorerHtml(show[0]);try{renderNow()}catch(e){}}
+    (TK.games.length>3?`<div class="tkmore">+ ${TK.games.length-3} weitere Spiele heute</div>`:'')+scorerHtml(show[0])}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')tkLoad()});
 window.addEventListener('online',()=>tkLoad());
 
@@ -1161,7 +1210,7 @@ function showLogo(blob){if(logoUrl)URL.revokeObjectURL(logoUrl);logoUrl=blob?URL
 $('#logoIn').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;await put('logo',f);showLogo(f);openSet();toast('Logo gespeichert')});
 
 /* ---------- Offline-Betrieb (nur wenn als eigene Seite gehostet) ---------- */
-try{if('serviceWorker' in navigator&&location.protocol==='https:'&&window.top===window)navigator.serviceWorker.register('sw.js').catch(()=>{})}catch(e){}
+try{if('serviceWorker' in navigator&&location.protocol==='https:'&&window.top===window){navigator.serviceWorker.register('sw.js').then(r=>{r.addEventListener('updatefound',()=>{const w=r.installing;if(w)w.addEventListener('statechange',()=>{if(w.state==='installed'&&navigator.serviceWorker.controller)toast('Neue Version geladen – greift beim nächsten Öffnen')})})}).catch(()=>{})}}catch(e){}
 
 /* ---------- Start ---------- */
 (async()=>{await openDb();try{const st=await get('state');if(st&&st.cats)S=st}catch(e){}
@@ -1170,7 +1219,8 @@ try{if('serviceWorker' in navigator&&location.protocol==='https:'&&window.top===
   S.cats.forEach(c=>{if(MIG[c.color])c.color=MIG[c.color]});
   if(!S.settings.mig3){S.settings.mig3=1;const M3={'#ffffff':'#6366f1','#3d7bff':'#0ea5e9','#22c3e6':'#eab308','#2fd17a':'#22c55e','#c6ff3d':'#14b8a6','#ffc21a':'#a855f7','#ff7a1a':'#f97316','#ff3344':'#ef4444','#ff3d9a':'#ec4899','#8f7bff':'#a855f7','#8a95a8':'#64748b','#d4a35a':'#eab308'};
     S.cats.forEach(c=>{if(M3[c.color])c.color=M3[c.color]});S.pads.forEach(p=>{if(M3[p.color])p.color=M3[p.color]});if(S.settings.cols===4)S.settings.cols=5;save()}S.pads.forEach(p=>{if(MIG[p.color])p.color=MIG[p.color]});
-  try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+  try{if(navigator.storage&&navigator.storage.persist){PERSIST=await navigator.storage.persisted();if(!PERSIST)PERSIST=await navigator.storage.persist()}}catch(e){}
+  if(IOS&&!STANDALONE&&!EMBED&&!S.settings.hsHint){S.settings.hsHint=1;save();setTimeout(()=>toast('Tipp: Über Teilen → „Zum Home-Bildschirm“ installieren – dann löscht Safari die Songs nie'),2500)}
   $('#mv').value=S.settings.master;$('#mvo').textContent=S.settings.master;master.gain.value=vol(S.settings.master);
   try{const lg=await get('logo');if(lg)showLogo(lg)}catch(e){}
   showMixer();applySide();tkLoad();checkMissing().then(s=>{if(s.size)render()});
