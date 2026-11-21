@@ -387,7 +387,7 @@ main{flex:1;min-height:0;overflow-y:auto;gap:8px;padding-bottom:8px}
 {
 const COLORS=['#14b8a6','#0d9488','#22c55e','#10b981','#84cc16','#eab308','#f97316','#ef4444','#ec4899','#a855f7','#6366f1','#3b82f6','#0ea5e9','#64748b'];
 function hue(hex,d){let r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2;let H=0,s=0;if(mx!==mn){const e=mx-mn;s=l>.5?e/(2-mx-mn):e/(mx+mn);H=mx===r?(g-b)/e+(g<b?6:0):mx===g?(b-r)/e+2:(r-g)/e+4;H*=60}H=(H+d+360)%360;const f=n=>{const k=(n+H/30)%12,a=s*Math.min(l,1-l);return Math.round((l-a*Math.max(-1,Math.min(k-3,9-k,1)))*255).toString(16).padStart(2,'0')};return '#'+f(0)+f(8)+f(4)}
-const VER='2026-11-20b';
+const VER='2026-11-20e';
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -455,10 +455,15 @@ const SND=new Map(),AN=new Map(),playing=new Map(),loading=new Map();
 /* Eigene Seite (GitHub / Home-Bildschirm): lange Songs werden gestreamt = kaum Arbeitsspeicher.
    In der Claude-Vorschau (eingebettet) blockiert iOS das Streamen → dort wird alles dekodiert. */
 const EMBED=(()=>{try{return window.top!==window}catch(e){return true}})();
-const SHORT=90,BUDGET=(Math.min(screen.width,screen.height)<600?220:380)*1048576;let bufBytes=0;
+const SMALL=Math.min(screen.width,screen.height)<600;
+const SHORT=90,BUDGET=(SMALL?160:260)*1048576;let bufBytes=0;
+/* Sofort-Start: von jedem längeren Song liegen die ersten Sekunden (ab Startpunkt) fertig im Speicher.
+   Antippen spielt sofort den Anfang, im Hintergrund wird der ganze Song geladen und nahtlos übernommen. */
+const HEADMIN=20,HLEN=10,HBUDGET=(SMALL?90:190)*1048576,HEADS=new Map();let headBytes=0;
+const hkey=(sid,st)=>sid+'@'+Math.round((st||0)*100);
 function evict(keep){while(bufBytes>BUDGET){let v=null;const busy=new Set([...playing.values()].map(o=>o.s));
   for(const [sid,s] of SND)if(s.kind==='buf'&&sid!==keep&&!sid.startsWith('gen:')&&!busy.has(s)&&(!v||(s.last||0)<(v[1].last||0)))v=[sid,s];
-  if(!v)break;SND.delete(v[0]);bufBytes-=bytes(v[1].buf);for(const p of S.pads)if(p.soundId===v[0]){const e=padEls.get(p.id);if(e)e.el.classList.add('ld')}}}
+  if(!v)break;SND.delete(v[0]);bufBytes-=bytes(v[1].buf);}}
 const MX={x:0,target:null,deck:{A:null,B:null},anim:0};
 function setX(v,fromSlider){MX.x=Math.min(1,Math.max(0,v));const a=Math.cos(MX.x*Math.PI/2),b=Math.sin(MX.x*Math.PI/2);
   DK.A.gain.setTargetAtTime(a,ctx.currentTime,.015);DK.B.gain.setTargetAtTime(b,ctx.currentTime,.015);
@@ -489,7 +494,9 @@ function analyze(b){const n=b.length,chs=[];for(let c=0;c<Math.min(2,b.numberOfC
 const normDb=sid=>{const a=AN.get(sid);if(!a||S.settings.norm===false)return 0;let g=Math.max(-15,Math.min(12,-17-a.L));return Math.min(g,-20*Math.log10(Math.max(a.peak,1e-4))+4)};
 const bytes=b=>b.length*b.numberOfChannels*4;
 const decode=async blob=>{const ab=await blob.arrayBuffer();return await new Promise((res,rej)=>{const r=ctx.decodeAudioData(ab,res,rej);if(r&&r.catch)r.catch(rej)})};
-function mkMedia(blob,dur){const el=new Audio();el.preload='metadata';el.playsInline=true;el.setAttribute('playsinline','');el.crossOrigin='anonymous';el.src=URL.createObjectURL(blob);
+const MIME={mp3:'audio/mpeg',m4a:'audio/mp4',aac:'audio/aac',wav:'audio/wav',ogg:'audio/ogg',oga:'audio/ogg',flac:'audio/flac',aif:'audio/aiff',aiff:'audio/aiff',caf:'audio/x-caf'};
+function mkMedia(blob,dur,name){const el=new Audio();el.preload='metadata';el.playsInline=true;el.setAttribute('playsinline','');el.crossOrigin='anonymous';
+  if(!blob.type){const t=MIME[String(name||'').split('.').pop().toLowerCase()];if(t)blob=new Blob([blob],{type:t})}el.src=URL.createObjectURL(blob);
   return{kind:'media',el,node:null,dur,url:el.src}}
 /* Web-Audio-Knoten erst beim ersten Abspielen anlegen – spart bei vielen Songs Speicher */
 function mediaNode(s){if(!s.node&&!s.noNode){try{s.node=ctx.createMediaElementSource(s.el)}catch(e){s.noNode=true;lg('?','Hinweis: Song läuft ohne Web-Audio-Kette ('+(e&&e.message||e)+')')}}return s.node}
@@ -498,17 +505,19 @@ function ensure(sid){
   const pr=(async()=>{let s;
     if(sid.startsWith('gen:')){const b=gen(sid.slice(4));if(!AN.has(sid))AN.set(sid,analyze(b));s={kind:'buf',buf:b,dur:b.duration}}
     else{const rec=await get('snd:'+sid);if(!rec)return null;
-      let an=AN.get(sid);if(!an){try{an=await get('an:'+sid)}catch(e){}}
-      if(!EMBED&&an&&an.dur>SHORT){AN.set(sid,an);s=mkMedia(rec.blob,an.dur)}
+      let an=AN.get(sid);if(!an){try{an=await get('an:'+sid)}catch(e){}}if(an&&an.ns)NOSTREAM.add(sid);
+      if(STREAM&&!NOSTREAM.has(sid)&&an&&an.dur>SHORT){AN.set(sid,an);s=mkMedia(rec.blob,an.dur,rec.name)}
       else{let b=await decode(rec.blob);if(!an){an=analyze(b);put('an:'+sid,an).catch(()=>{})}AN.set(sid,an);
-        if(!EMBED&&an.dur>SHORT){b=null;s=mkMedia(rec.blob,an.dur)}
-        else{bufBytes+=bytes(b);s={kind:'buf',buf:b,dur:b.duration}}}}
+        if(STREAM&&!NOSTREAM.has(sid)&&an.dur>SHORT){b=null;s=mkMedia(rec.blob,an.dur,rec.name)}
+        else{if(!STREAM&&an.dur>HEADMIN)try{makeHeads(sid,b)}catch(e){}bufBytes+=bytes(b);s={kind:'buf',buf:b,dur:b.duration}}}}
     s.last=performance.now();SND.set(sid,s);evict(sid);markReady(sid);return s})().finally(()=>loading.delete(sid));
   loading.set(sid,pr);return pr}
-function drop(sid){loading.delete(sid);const s=SND.get(sid);if(s){if(s.kind==='buf')bufBytes-=bytes(s.buf);else{try{s.el.pause();URL.revokeObjectURL(s.url);s.el.removeAttribute('src');s.el.load()}catch(e){}}}
+function drop(sid){loading.delete(sid);for(const [k,h] of [...HEADS])if(k.startsWith(sid+'@')){HEADS.delete(k);headBytes-=bytes(h.buf)}allKeys().then(ks=>ks.filter(k=>String(k).startsWith('hd:'+sid+'@')).forEach(k=>del(k).catch(()=>{}))).catch(()=>{});const s=SND.get(sid);if(s){if(s.kind==='buf')bufBytes-=bytes(s.buf);else{try{s.el.pause();URL.revokeObjectURL(s.url);s.el.removeAttribute('src');s.el.load()}catch(e){}}}
   SND.delete(sid);AN.delete(sid);del('an:'+sid).catch(()=>{})}
 const STANDALONE=(()=>{try{return matchMedia('(display-mode: standalone)').matches||navigator.standalone===true}catch(e){return false}})();let PERSIST=null;
 const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+/* Streamen langer Songs nur am PC. iPad/iPhone melden beim Streamen teils dauerhaft Position 0 und brechen ab → dort wird alles dekodiert (mit Speicher-Limit). */
+const STREAM=!EMBED&&!IOS,NOSTREAM=new Set();
 function unlockMedia(){if(!IOS)return;/* nie, während ein gestreamter Song läuft – auf dem iPhone könnte das stumme Freischalten ihn stören */for(const o of playing.values())if(o.s.kind==='media')return;
   for(const s of SND.values())if(s.kind==='media'&&!s.ok&&!s.live&&!s.trying){s.trying=true;const el=s.el;el.muted=true;
   let pr;try{pr=el.play()}catch(e){}if(pr&&pr.then)pr.then(()=>{s.ok=true;s.trying=false;if(!s.live){el.pause();try{el.currentTime=0}catch(e){}}el.muted=false}).catch(()=>{s.trying=false;el.muted=false});else{s.trying=false;el.muted=false}}}
@@ -537,16 +546,41 @@ let wl=null;async function keepAwake(){try{if(!wl&&navigator.wakeLock){wl=await 
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){keepAwake();if(ctx.state!=='running')ctx.resume().catch(()=>{})}});
 
 
+function headPut(k,buf,base,dur){if(HEADS.has(k))return;const b=bytes(buf);if(headBytes+b>HBUDGET)return;HEADS.set(k,{buf,base,dur});headBytes+=b}
+/* Köpfe aus dem ganzen Song schneiden und dauerhaft (16 Bit) speichern – beim nächsten App-Start sind sie ohne Dekodieren sofort da */
+function makeHeads(sid,full){const sr=full.sampleRate;
+  for(const st of new Set([0,...S.pads.filter(p=>p.soundId===sid).map(p=>Math.min(p.start||0,Math.max(0,full.duration-.05)))])){const k=hkey(sid,st);if(HEADS.has(k))continue;
+    const s0=Math.floor(st*sr),n=Math.max(1,Math.min(Math.floor(HLEN*sr),full.length-s0));
+    const hb=ctx.createBuffer(full.numberOfChannels,n,sr),rec={sr,dur:full.duration,base:st,n,ch:[]};
+    for(let c=0;c<full.numberOfChannels;c++){const src=full.getChannelData(c).subarray(s0,s0+n);hb.copyToChannel(src,c);const i16=new Int16Array(n);for(let i=0;i<n;i++){const v=src[i];i16[i]=v<-1?-32767:v>1?32767:v*32767}rec.ch.push(i16)}
+    headPut(k,hb,st,full.duration);put('hd:'+k,rec).catch(()=>{})}}
+async function loadHeads(sid){let ok=true;
+  for(const st of new Set(S.pads.filter(p=>p.soundId===sid).map(p=>p.start||0))){const k=hkey(sid,st);if(HEADS.has(k))continue;
+    let r=null;try{r=await get('hd:'+k)}catch(e){}
+    if(!r||!r.ch||!r.ch.length){ok=false;continue}
+    const hb=ctx.createBuffer(r.ch.length,r.n,r.sr);r.ch.forEach((a,c)=>{const f=hb.getChannelData(c);for(let i=0;i<a.length;i++)f[i]=a[i]/32767});headPut(k,hb,r.base,r.dur)}
+  return ok}
+function headFor(p){if(STREAM||!p.soundId)return null;const h=HEADS.get(hkey(p.soundId,p.start||0));return h?{kind:'buf',buf:h.buf,base:h.base,dur:h.dur,head:true}:null}
+/* ganzen Song nachladen und ohne hörbaren Übergang übernehmen */
+function bgFull(p,key){ensure(p.soundId).then(full=>{const o=playing.get(key);if(!full||!o||!o.head||o.done)return;
+  if(o.fading&&!o.gap)return;
+  const t1=ctx.currentTime+.06,el=t1-o.t0;if(!o.loop&&el>=o.len-.05){end(o);return}
+  const off=o.st+(o.loop?el%o.len:el);const src=ctx.createBufferSource();src.buffer=full.buf;src.connect(o.g);
+  if(o.loop){src.loop=true;src.loopStart=o.st;src.loopEnd=o.en;src.start(t1,off)}else src.start(t1,off,o.en-off);
+  if(o.gap)lg(key,'Ganzer Song geladen nach '+el.toFixed(1)+' s – weiter');
+  else{try{o.src.onended=null;o.src.stop(t1)}catch(e){}}
+  o.src=src;o.s=full;o.head=false;o.gap=false;src.onended=o.onEnd}).catch(e=>{lg(key,'Ganzer Song nicht ladbar: '+(e&&e.message||e))})}
 function play(p,preview){
   unlock();if(!p.soundId){if(!preview)openPad(p.id);return}
   const s=SND.get(p.soundId);
   if(s)return start(p,s,preview);
   const key=preview?'pv':p.id;
+  const h=headFor(p);if(h){start(p,h,preview);if(playing.get(key)&&playing.get(key).head)bgFull(p,key);return}
   /* Pad lädt noch: zweites Antippen wird ignoriert statt doppelt zu starten */
   if(PEND.has(key)){lg(key,'Lädt noch – zweites Antippen ignoriert');toast('„'+p.name+'“ lädt noch …');return}
   const tok={};PEND.set(key,tok);
   const pe=padEls.get(p.id);if(pe)pe.el.classList.add('ld');
-  ensure(p.soundId).then(x=>{if(PEND.get(key)!==tok)return;PEND.delete(key);if(x)start(p,x,preview);else toast('Datei fehlt – bitte im Pad neu wählen')})
+  ensure(p.soundId).then(x=>{if(PEND.get(key)!==tok)return;PEND.delete(key);{const q=padEls.get(p.id);if(q)q.el.classList.remove('ld')}if(x)start(p,x,preview);else toast('Datei fehlt – bitte im Pad neu wählen')})
     .catch(e=>{if(PEND.get(key)===tok)PEND.delete(key);const pe=padEls.get(p.id);if(pe)pe.el.classList.remove('ld');lg(key,'Fehler beim Laden: '+(e&&e.message||e));toast('„'+p.name+'“ kann nicht gelesen werden'+(e&&e.message?': '+e.message:''))})}
 const PEND=new Map();
 function start(p,s,preview){try{
@@ -564,25 +598,35 @@ function start(p,s,preview){try{
   if(!p.loop&&p.fadeOut>0&&len>p.fadeOut*2){g.gain.setValueAtTime(v,now+len-p.fadeOut);g.gain.linearRampToValueAtTime(0.0001,now+len)}
   s.last=performance.now();const o={s,g,t0:now,st,en,len,loop:p.loop,fading:false,dk,key,ms:performance.now(),started:s.kind==='buf'};lg(key,'Start'+(dk?' auf Deck '+dk:'')+(s.kind==='media'?' (gestreamt)':''));
   if(s.kind==='buf'){const src=ctx.createBufferSource();src.buffer=s.buf;src.connect(g);o.src=src;
-    if(p.loop){src.loop=true;src.loopStart=st;src.loopEnd=en;src.start(now,st)}else src.start(now,st,len);
-    src.onended=()=>{if(playing.get(key)!==o)return;
+    if(s.head){o.head=true;src.start(now,Math.max(0,st-s.base));lg(key,'Sofort-Start mit Anfang, ganzer Song lädt im Hintergrund')}
+    else if(p.loop){src.loop=true;src.loopStart=st;src.loopEnd=en;src.start(now,st)}else src.start(now,st,len);
+    o.onEnd=()=>{if(playing.get(key)!==o)return;
       /* Wächter: endet ein Sound ohne Grund deutlich vor seinem Ende, wird er an der Stelle fortgesetzt */
       const el=ctx.currentTime-o.t0;if(!o.done&&!o.fading&&!o.loop&&el<o.len-.3&&(o.retry=(o.retry||0)+1)<=3){lg(key,'Vorzeitig beendet bei '+el.toFixed(1)+' s – automatisch fortgesetzt');resumeBuf(o,el);return}
-      if(!o.fading)lg(key,'Ende: Song zu Ende');end(o)}}
+      if(!o.fading)lg(key,'Ende: Song zu Ende');end(o)};
+    src.onended=s.head?()=>{if(playing.get(key)!==o||o.done||!o.head)return;if(o.fading){end(o);return}o.gap=true;lg(key,'Anfang zu Ende, ganzer Song noch nicht da – Lücke')}:o.onEnd}
   else{const el=s.el;s.live=true;el.muted=false;el.preload='auto';o.v=v;const nd=mediaNode(s);
     if(nd){try{nd.disconnect()}catch(e){}nd.connect(g);el.volume=1}else el.volume=Math.min(1,v*master.gain.value);
     try{el.currentTime=st}catch(e){}
     if(el.readyState<1)el.addEventListener('loadedmetadata',()=>{if(playing.get(key)===o){try{el.currentTime=st}catch(e){}}},{once:true});
     el.addEventListener('playing',()=>{if(playing.get(key)!==o)return;if(!o.started){o.started=true;o.ms=performance.now();o.lt=el.currentTime;o.lp=o.ms;const pe=padEls.get(p.id);if(pe)pe.el.classList.remove('ld')}},{once:true});
     if(!preview){const pe=padEls.get(p.id);if(pe&&el.readyState<3)pe.el.classList.add('ld')}
+    el.onerror=()=>{if(!o.done&&playing.get(key)===o)streamFail(o,'Datei-Fehler '+(el.error&&el.error.code))};
     el.onpause=()=>{if(!el.paused||o.done||o.fading||playing.get(key)!==o||el.ended)return; /* verspätetes Pause-Ereignis vom vorherigen Durchlauf desselben Songs ignorieren */if((o.retry=(o.retry||0)+1)>3){lg(key,'Vom Browser angehalten – nach 3 Versuchen aufgegeben');end(o);return}lg(key,'Vom Browser angehalten bei '+el.currentTime.toFixed(1)+' s – automatisch fortgesetzt');setTimeout(()=>{if(!o.done&&playing.get(key)===o&&el.paused)el.play().catch(()=>{})},120)};
     el.onended=()=>{if(o.loop&&!o.fading&&playing.get(key)===o){try{el.currentTime=o.st}catch(e){}el.play().catch(()=>{});return}
-      if(!o.done&&!o.fading&&playing.get(key)===o&&el.currentTime<o.en-1&&(o.retry=(o.retry||0)+1)<=3){lg(key,'Vorzeitig beendet bei '+el.currentTime.toFixed(1)+' s – automatisch fortgesetzt');el.play().catch(()=>{});return}lg(key,'Ende: Song zu Ende');end(o)};
+      if(!o.done&&!o.fading&&playing.get(key)===o&&el.currentTime<o.en-1){streamFail(o,'vorzeitig beendet bei '+el.currentTime.toFixed(1)+' s');return}lg(key,'Ende: Song zu Ende');end(o)};
     const pr=el.play();if(pr&&pr.catch)pr.catch(err=>{if(playing.get(key)===o){lg(key,'play() abgelehnt: '+(err&&err.name||err));toast('iPad hat den Start blockiert – Pad nochmal antippen');lg(key,'Fehler: Start vom iPad blockiert');end(o)}})}
   playing.set(key,o);renderNow();paint();
   const ct0=ctx.currentTime,cx=ctx;
   setTimeout(()=>{if(playing.get(key)!==o||cx!==ctx)return;if(ctx.state!=='running'||ctx.currentTime-ct0<.15){lg(key,'Kein Ton – Audio-Uhr steht ('+ctx.state+')');HB.frozen=true;end(o);ctx.resume().catch(()=>{});toast('Audio war eingeschlafen – Pad bitte nochmal antippen')}},700)
 }catch(e){console.error(e);toast('Fehler beim Abspielen von „'+p.name+'“')}}
+/* Streamen klappt nicht → Song einmal komplett dekodieren und über Web Audio abspielen (wie die kurzen Jingles). Danach für diesen Song nie wieder streamen. */
+function streamFail(o,why){const key=o.key,p=key==='pv'?S.pads.find(x=>x.id===edId):S.pads.find(x=>x.id===key);if(!p)return end(o);const sid=p.soundId,el=o.s.el;
+  lg(key,'Streamen klappt nicht ('+why+'; Status '+el.readyState+'/'+el.networkState+', Länge '+(el.duration||0).toFixed(1)+' s) – wird jetzt komplett geladen');
+  NOSTREAM.add(sid);get('an:'+sid).then(a=>{if(a)put('an:'+sid,{...a,ns:1})}).catch(()=>{});
+  const wasPrev=key==='pv';playing.delete(key);cleanup(o);try{URL.revokeObjectURL(o.s.url)}catch(e){}SND.delete(sid);renderNow();paint();
+  const tok={};PEND.set(key,tok);const pe=padEls.get(p.id);if(pe)pe.el.classList.add('ld');
+  ensure(sid).then(x=>{if(PEND.get(key)!==tok)return;PEND.delete(key);if(pe)pe.el.classList.remove('ld');if(x)start(p,x,wasPrev)}).catch(e=>{PEND.delete(key);if(pe)pe.el.classList.remove('ld');toast('„'+p.name+'“ kann nicht gelesen werden')})}
 function resumeBuf(o,off){try{const src=ctx.createBufferSource();src.buffer=o.s.buf;src.connect(o.g);const now=ctx.currentTime,rest=Math.max(.05,o.len-off);
   src.start(now,o.st+off,rest);o.src=src;o.t0=now-off;src.onended=()=>{if(playing.get(o.key)!==o)return;if(!o.fading)lg(o.key,'Ende: Song zu Ende');end(o)}}catch(e){end(o)}}
 function cleanup(o){o.done=true;clearTimeout(o.tm);
@@ -595,7 +639,7 @@ function tickMedia(){const nowMs=performance.now();for(const o of playing.values
   if(!o.s.node&&o.vf){const k=Math.max(0,1-(nowMs-o.vf.t)/o.vf.d);el.volume=Math.max(0,Math.min(1,o.vf.v*k))}
   if(!o.started||o.fading)continue;const ct=el.currentTime;
   /* Hänger-Wächter: Zeit steht > 2,5 s still, obwohl nicht pausiert → neu anstoßen */
-  if(ct!==o.lt){o.lt=ct;o.lp=nowMs}else if(!el.paused&&nowMs-o.lp>2500&&!o.done){o.lp=nowMs;if((o.stall=(o.stall||0)+1)<=3){lg(o.key,'Song hing bei '+ct.toFixed(1)+' s – neu angestoßen');try{el.currentTime=ct+.01}catch(e){}el.play().catch(()=>{})}}
+  if(ct!==o.lt){o.lt=ct;o.lp=nowMs}else if(!el.paused&&nowMs-o.lp>2500&&!o.done){o.lp=nowMs;streamFail(o,'Position bleibt bei '+ct.toFixed(1)+' s stehen')}
   /* nur beenden, wenn der Song wirklich vom Startpunkt bis zum Endpunkt gelaufen ist – nicht, weil ein alter Abspielstand noch drinsteht */
   if(o.en<o.s.dur-.05&&ct>=o.en-.02&&ct>o.st+.2&&performance.now()-o.ms>300){if(o.loop){try{o.s.el.currentTime=o.st}catch(e){}}else{lg(o.key,'Ende: Endpunkt erreicht');end(o)}}}}
 function fade(id,t){const o=playing.get(id);if(!o||o.fading)return;const p=S.pads.find(x=>x.id===id);
@@ -645,7 +689,7 @@ function renderTabs(){
 const isPl=p=>!!catOf(p.catId)?.players;
 const offTxt=()=>S.settings.tap==='stop'?'TIPPEN = STOPP':S.settings.tap==='restart'?'LÄUFT':'TIPPEN = AUS';
 function padHtml(p,i){
-  const empty=!p.soundId||MISSING.has(p.soundId),ld=!empty&&!SND.has(p.soundId),pl=isPl(p);const k=i<9&&!pl?`<span class="key">${i+1}</span>`:'';
+  const empty=!p.soundId||MISSING.has(p.soundId),ld=PEND.has(p.id),pl=isPl(p);const k=i<9&&!pl?`<span class="key">${i+1}</span>`:'';
   const tm=`<span class="tm">${MISSING.has(p.soundId)?'Song fehlt':empty?'keine Datei':fmt(p.dur?(p.end||p.dur)-(p.start||0):0)}</span>`;
   const grip=editMode?'<span class="grip" data-grip="1" aria-label="Verschieben"><i></i><i></i><i></i></span>':'';
   if(pl)return `<button class="pad pl ${empty?'empty':''} ${ld?'ld':''}" style="--c:${colorOf(p)}" data-pad="${p.id}">${grip}<span class="off">${offTxt()}</span><div class="fill"></div><div class="nr">${p.nr!=null&&p.nr!==''?esc(p.nr):'–'}</div><div class="meta"><span class="pn">${esc(p.name)}</span>${tm}</div></button>`;
@@ -669,7 +713,7 @@ function render(){
   m.querySelectorAll('.pad[data-pad]').forEach(el=>padEls.set(el.dataset.pad,{el,fill:el.querySelector('.fill'),tm:el.querySelector('.tm')}));
   painted.clear();paint()
 }
-function markReady(sid){for(const p of S.pads)if(p.soundId===sid){const e=padEls.get(p.id);if(e){e.el.classList.remove('ld');if(!p.dur||!e.tm.textContent.startsWith('-'))e.tm.textContent=fmt((p.end||SND.get(sid).dur)-(p.start||0))}}}
+function markReady(sid){let ch=false;for(const p of S.pads)if(p.soundId===sid){const d=SND.get(sid)?.dur;if(!p.dur&&d){p.dur=d;ch=true}const e=padEls.get(p.id);if(e){if(!PEND.has(p.id))e.el.classList.remove('ld');if(!p.dur||!e.tm.textContent.startsWith('-'))e.tm.textContent=fmt((p.end||SND.get(sid).dur)-(p.start||0))}}if(ch)save()}
 function updDecks(){if(!S.settings.mixer)return;const nx=autoDeck();
   for(const d of['A','B']){const el=document.getElementById('dk'+d);if(!el)continue;const id=MX.deck[d],o=id&&playing.get(id),p=o&&S.pads.find(x=>x.id===id);
     el.style.setProperty('--c',p?colorOf(p):'#ffffff');el.classList.toggle('live',!!(o&&!o.fading));el.classList.toggle('tgt',nx===d);
@@ -682,9 +726,9 @@ let nowSig=null;
 function renderNow(){
   renderTabs();updDecks();
   const items=[...playing.entries()].filter(([k])=>k!=='pv');
-  const nsig=items.map(([k])=>k).join(',');if(nsig===nowSig&&$('#now').childElementCount)return;nowSig=nsig;
+  const nsig=items.map(([k])=>k).join(',')+(items.length?'':'|'+PRE.n+'/'+PRE.total);if(nsig===nowSig&&$('#now').childElementCount)return;nowSig=nsig;
   $('#now').innerHTML=(items.length?items.map(([id])=>{const p=S.pads.find(x=>x.id===id);if(!p)return'';
-    return `<button class="chip" style="--c:${colorOf(p)}" data-chip="${id}"><b>${isPl(p)&&p.nr?'#'+esc(p.nr)+' ':''}${esc(p.name)}</b><div class="bar"><i></i></div><span><em>tippen = aus</em><strong class="rm"></strong></span></button>`}).join(''):'<span class="idle">Bereit</span>')
+    return `<button class="chip" style="--c:${colorOf(p)}" data-chip="${id}"><b>${isPl(p)&&p.nr?'#'+esc(p.nr)+' ':''}${esc(p.name)}</b><div class="bar"><i></i></div><span><em>tippen = aus</em><strong class="rm"></strong></span></button>`}).join(''):(PRE.total?`<span class="idle">Lade Sounds vor … ${PRE.n}/${PRE.total} · Antippen geht schon</span>`:'<span class="idle">Bereit</span>'))
 }
 const painted=new Set();
 function paint(){
@@ -746,7 +790,7 @@ function readPad(){const p=S.pads.find(x=>x.id===edId);if(!p)return;
   p.name=$('#eName').value.trim()||'Ohne Name';if($('#eNr'))p.nr=$('#eNr').value.replace(/\D/g,'');p.catId=$('#eCat').value;p.excl=$('#eEx').value;
   p.vol=+$('#eVol').value;p.fadeIn=+$('#eFi').value;p.fadeOut=+$('#eFo').value;p.start=+$('#eSt').value;p.end=+$('#eEn').value;p.loop=$('#eLoop').checked;
   const s=$('#eCol .sel');p.color=s?s.dataset.c:'';return p}
-function closePad(){if(playing.has('pv'))fade('pv',.3);readPad();save();$('#ovPad').classList.remove('open');edId=null;render()}
+function closePad(){if(playing.has('pv'))fade('pv',.3);readPad();save();{const p=S.pads.find(x=>x.id===edId),f=p&&SND.get(p.soundId);if(f&&f.kind==='buf'&&!STREAM&&f.dur>HEADMIN)try{makeHeads(p.soundId,f.buf)}catch(e){}}$('#ovPad').classList.remove('open');edId=null;render()}
 
 async function addFiles(files,catId,replaceId){
   let first=null;
@@ -771,7 +815,7 @@ function openSet(){const s=S.settings;
    ${slider('sCols','Pads pro Reihe (iPad quer)',s.cols,3,8,1,'')}
   </div></details>
   <details><summary>Diagnose</summary><div class="in"><p class="hint">Hier steht, warum ein Sound gestartet oder beendet wurde – die letzten 80 Ereignisse, neueste oben. Bricht ein Sound unerwartet ab, hier nachschauen oder mir den Text schicken.</p>
-   <div class="diag"><div><b>Version</b> ${VER} · ${STANDALONE?'Home-Bildschirm-App':EMBED?'Claude-Vorschau':'Browser-Tab'} · Speicher dauerhaft: ${PERSIST===true?'ja':PERSIST===false?'nein':'?'}</div><div><b>Audio</b> ${ctx.state} · Modus: ${EMBED?'Vorschau – alles geladen':'eigene Seite – lange Songs gestreamt'} · Wiedergabe-Modus: ${navigator.audioSession?navigator.audioSession.type:'nicht verfügbar'} · Stumm-Schutz: ${silentEl&&!silentEl.paused?'aktiv':'aus'} · Speicher: ${Math.round(bufBytes/1048576)} von ${Math.round(BUDGET/1048576)} MB</div>${LOG.length?LOG.slice().reverse().map(x=>`<div><b>${x.t.toLocaleTimeString('de-DE')}</b> ${esc(x.n)} – ${esc(x.ev)}</div>`).join(''):'<div>Noch keine Ereignisse.</div>'}</div>
+   <div class="diag"><div><b>Version</b> ${VER} · ${STANDALONE?'Home-Bildschirm-App':EMBED?'Claude-Vorschau':'Browser-Tab'} · Speicher dauerhaft: ${PERSIST===true?'ja':PERSIST===false?'nein':'?'}</div><div><b>Audio</b> ${ctx.state} · Modus: ${STREAM?'PC – lange Songs gestreamt':'alle Songs geladen (iPad-sicher)'} · Wiedergabe-Modus: ${navigator.audioSession?navigator.audioSession.type:'nicht verfügbar'} · Stumm-Schutz: ${silentEl&&!silentEl.paused?'aktiv':'aus'} · Speicher: ${Math.round(bufBytes/1048576)} von ${Math.round(BUDGET/1048576)} MB · Sofort-Start: ${HEADS.size} Songs (${Math.round(headBytes/1048576)} MB)</div>${LOG.length?LOG.slice().reverse().map(x=>`<div><b>${x.t.toLocaleTimeString('de-DE')}</b> ${esc(x.n)} – ${esc(x.ev)}</div>`).join(''):'<div>Noch keine Ereignisse.</div>'}</div>
    <div class="acts"><button class="btn" id="bDiag">Als Text kopieren</button><button class="btn" id="bDiagClr">Protokoll leeren</button></div></div></details>
   <details><summary>WümmeTicker</summary><div class="in">
    <label class="chk"><input type="checkbox" id="sTk" ${s.tk!==false?'checked':''}> Spielstände links in der Seitenleiste zeigen</label>
@@ -884,7 +928,16 @@ async function preloadAll(){/* kurze Clips zuerst, lange Songs nur solange Platz
   const sids=[...new Set(S.pads.map(p=>p.soundId).filter(Boolean))],du={};
   for(const sid of sids){let a=AN.get(sid);if(!a&&!sid.startsWith('gen:')){try{a=await get('an:'+sid)}catch(e){}}du[sid]=a?a.dur:60}
   sids.sort((a,b)=>du[a]-du[b]);
-  for(const sid of sids){if(EMBED&&du[sid]>SHORT&&bufBytes+du[sid]*ctx.sampleRate*8>BUDGET*.85)continue;try{await ensure(sid)}catch(e){console.warn('Sound nicht lesbar',sid,e)}}}
+  const todo=STREAM?sids:sids;
+  PRE.n=0;PRE.total=todo.length;PRE.bad=0;renderNow();
+  for(const sid of todo){
+    /* hängt eine Datei (defekt / falsches Format), blockiert sie nicht alle anderen */
+    try{if(!STREAM&&du[sid]>HEADMIN&&!sid.startsWith('gen:')){if(await loadHeads(sid)){PRE.n++;renderNow();continue}}
+      await Promise.race([ensure(sid),new Promise((_,rj)=>setTimeout(()=>rj(new Error('Zeitüberschreitung')),25000))])}
+    catch(e){PRE.bad++;const p=S.pads.find(x=>x.soundId===sid);lg(p?p.id:'?','Vorladen fehlgeschlagen: '+(e&&e.message||e))}
+    PRE.n++;renderNow()}
+  PRE.total=0;renderNow();if(PRE.bad)toast(PRE.bad+(PRE.bad>1?' Songs':' Song')+' ließen sich nicht vorladen – Details unter Einstellungen › Diagnose')}
+const PRE={n:0,total:0,bad:0};
 async function resetAll(){stopAll();duck(false);
   for(const sid of [...SND.keys()])drop(sid);
   try{if(db)await tx('readwrite',s=>s.clear());else mem.clear()}catch(e){}
